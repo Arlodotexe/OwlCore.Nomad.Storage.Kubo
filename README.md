@@ -1,15 +1,8 @@
 # OwlCore.Nomad.Storage.Kubo [![Version](https://img.shields.io/nuget/v/OwlCore.Nomad.Storage.Kubo.svg)](https://www.nuget.org/packages/OwlCore.Nomad.Storage.Kubo)
 
-Description goes here.
+A storage implementation powered by shared event sourcing on IPFS.
 
-Extended description goes here. Tell people why they should use your module, how they can install it, and how they can use it. Documentation takes work!
-
-## 
-
-## Featuring:
-- x
-- y
-- z
+This library is in prerelease and documentation is work in progress. Please return later.
 
 ## Install
 
