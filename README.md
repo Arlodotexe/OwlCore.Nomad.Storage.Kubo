@@ -1,4 +1,4 @@
-# OwlCore.Template [![Version](https://img.shields.io/nuget/v/OwlCore.Template.svg)](https://www.nuget.org/packages/OwlCore.Template)
+# OwlCore.Nomad.Storage.Kubo [![Version](https://img.shields.io/nuget/v/OwlCore.Nomad.Storage.Kubo.svg)](https://www.nuget.org/packages/OwlCore.Nomad.Storage.Kubo)
 
 Description goes here.
 
@@ -13,13 +13,13 @@ Extended description goes here. Tell people why they should use your module, how
 
 ## Install
 
-Published releases are available on [NuGet](https://www.nuget.org/packages/OwlCore.Template). To install, run the following command in the [Package Manager Console](https://docs.nuget.org/docs/start-here/using-the-package-manager-console).
+Published releases are available on [NuGet](https://www.nuget.org/packages/OwlCore.Nomad.Storage.Kubo). To install, run the following command in the [Package Manager Console](https://docs.nuget.org/docs/start-here/using-the-package-manager-console).
 
-    PM> Install-Package OwlCore.Template
+    PM> Install-Package OwlCore.Nomad.Storage.Kubo
     
 Or using [dotnet](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet)
 
-    > dotnet add package OwlCore.Template
+    > dotnet add package OwlCore.Nomad.Storage.Kubo
 
 ## Usage
 
