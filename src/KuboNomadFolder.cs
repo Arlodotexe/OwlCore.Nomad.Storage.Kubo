@@ -1,7 +1,8 @@
 ﻿using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
-using OwlCore.ComponentModel.Nomad;
+using OwlCore.Nomad;
+using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage;
 using System;
@@ -10,47 +11,35 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OwlCore.Nomad.Storage;
 
 namespace OwlCore.Kubo.Nomad.Storage;
 
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
 /// </summary>
-public class KuboNomadFolder : NomadFolder<Cid, NomadEventStream, NomadEventStreamEntry>, IModifiableKuboBasedNomadFolder
+public class KuboNomadFolder : NomadFolder<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>, IModifiableKuboBasedNomadFolder
 {
     /// <summary>
     /// Creates a new instance of <see cref="KuboNomadFolder"/>.
     /// </summary>
     /// <param name="listeningEventStreamHandlers">The shared collection of known nomad event streams participating in event seeking.</param>
-    public KuboNomadFolder(ICollection<ISharedEventStreamHandler<Cid, NomadEventStream, NomadEventStreamEntry>> listeningEventStreamHandlers)
+    public KuboNomadFolder(ICollection<ISharedEventStreamHandler<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>> listeningEventStreamHandlers)
         : base(listeningEventStreamHandlers)
     {
     }
 
-    /// <summary>
-    /// The client to use for communicating with Ipfs.
-    /// </summary>
+    /// <inheritdoc/>
+    public required IKuboOptions KuboOptions { get; set; }
+
+    /// <inheritdoc/>
     public required ICoreApi Client { get; set; }
 
-    /// <summary>
-    /// Whether to pin content added to Ipfs.
-    /// </summary>
-    public bool ShouldPin { get; set; }
-
-    /// <summary>
-    /// Whether to use the cache when resolving Ipns Cids.
-    /// </summary>
-    public bool UseCache { get; set; }
-
-    /// <summary>
-    /// The lifetime of the ipns key containing the local event stream. Your node will need to be online at least once every <see cref="IpnsLifetime"/> to keep the ipns key alive.
-    /// </summary>
-    public TimeSpan IpnsLifetime { get; set; }
-
-    /// <summary>
-    /// The name of an Ipns key containing a Nomad event stream that can be appended and republished to modify the current folder.
-    /// </summary>
+    /// <inheritdoc />
     public required string LocalEventStreamKeyName { get; init; }
+
+    /// <inheritdoc />
+    public required string RoamingKeyName { get; init; }
 
     /// <summary>
     /// The interval that IPNS should be checked for updates.
@@ -77,10 +66,9 @@ public class KuboNomadFolder : NomadFolder<Cid, NomadEventStream, NomadEventStre
             Name = name,
             Sources = Sources,
             LocalEventStreamKeyName = LocalEventStreamKeyName,
-            IpnsLifetime = IpnsLifetime,
-            UseCache = UseCache,
-            ShouldPin = ShouldPin,
             Parent = this,
+            KuboOptions = KuboOptions,
+            RoamingKeyName = RoamingKeyName,
         };
 
         Items.Add(newFolder);
@@ -103,8 +91,8 @@ public class KuboNomadFolder : NomadFolder<Cid, NomadEventStream, NomadEventStre
             Name = name,
             Parent = this,
             CurrentContentId = emptyContent.Id,
-            UseCache = UseCache,
-            ShouldPin = ShouldPin,
+            KuboOptions = KuboOptions,
+            RoamingKeyName = RoamingKeyName,
             Sources = Sources,
         };
 
@@ -130,7 +118,7 @@ public class KuboNomadFolder : NomadFolder<Cid, NomadEventStream, NomadEventStre
     }
 
     /// <inheritdoc />
-    public override Task TryAdvanceEventStreamAsync(NomadEventStreamEntry streamEntry, CancellationToken cancellationToken)
+    public override Task TryAdvanceEventStreamAsync(KuboNomadEventStreamEntry streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
         return KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync(this, streamEntry, cancellationToken);

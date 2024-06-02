@@ -1,11 +1,12 @@
 ﻿using Ipfs;
 using Ipfs.CoreApi;
-using OwlCore.ComponentModel.Nomad;
+using OwlCore.Nomad;
 using OwlCore.Extensions;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OwlCore.Nomad.Kubo;
 
 namespace OwlCore.Kubo.Nomad.Extensions;
 
@@ -19,7 +20,7 @@ public static class ResolveEventStreamSources
     /// </summary>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
     /// <returns></returns>
-    public static async Task<IEnumerable<NomadEventStreamEntry>> ResolveEventStreamsAsync(this IEnumerable<EventStream<Cid>> eventStreams, ICoreApi client, bool useCache, CancellationToken cancellationToken)
+    public static async Task<IEnumerable<KuboNomadEventStreamEntry>> ResolveEventStreamsAsync(this IEnumerable<EventStream<Cid>> eventStreams, ICoreApi client, bool useCache, CancellationToken cancellationToken)
     {
         // Get all event entries across all sources
         var allEventEntries = await eventStreams
@@ -30,7 +31,7 @@ public static class ResolveEventStreamSources
                     x.Add(item);
                 return x;
             })
-            .InParallel(x => x.ResolveDagCidAsync<NomadEventStreamEntry>(client, nocache: !useCache, cancellationToken));
+            .InParallel(x => x.ResolveDagCidAsync<KuboNomadEventStreamEntry>(client, nocache: !useCache, cancellationToken));
 
         var sortedEventEntries = allEventEntries
             .Select(x => x.Result)

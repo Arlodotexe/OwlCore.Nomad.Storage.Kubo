@@ -43,7 +43,7 @@ public class WritableNomadFileStream : WritableLazySeekStream
         if (DestinationStream.Position != 0)
             DestinationStream.Seek(0, SeekOrigin.Begin);
 
-        var added = await KuboNomadFile.Client.FileSystem.AddAsync(DestinationStream, KuboNomadFile.Name, new AddFileOptions { Pin = KuboNomadFile.ShouldPin }, cancel: cancellationToken);
+        var added = await KuboNomadFile.Client.FileSystem.AddAsync(DestinationStream, KuboNomadFile.Name, new AddFileOptions { Pin = KuboNomadFile.KuboOptions.ShouldPin }, cancel: cancellationToken);
 
         var fileUpdateEvent = new FileUpdateEvent(KuboNomadFile.Id, added.Id);
         await KuboNomadFile.AppendNewEntryAsync(fileUpdateEvent, cancellationToken);

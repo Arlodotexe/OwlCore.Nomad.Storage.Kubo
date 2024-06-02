@@ -1,15 +1,16 @@
 ﻿using CommunityToolkit.Diagnostics;
 using Ipfs;
 using OwlCore.ComponentModel;
-using OwlCore.ComponentModel.Nomad;
-using OwlCore.Extensions;
+using OwlCore.Nomad;
+using OwlCore.Nomad.Kubo;
+using OwlCore.Nomad.Storage;
+using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage;
 using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using OwlCore.Nomad.Storage.Models;
 
 namespace OwlCore.Kubo.Nomad.Storage;
 
@@ -19,7 +20,7 @@ namespace OwlCore.Kubo.Nomad.Storage;
 public static class KuboBasedNomadStorageExtensions
 {
     /// <inheritdoc cref="IEventStreamHandler{TEventStreamEntry}"/>
-    public static async Task TryAdvanceEventStreamAsync(this IReadOnlyKuboBasedNomadStorage nomadStorage, NomadEventStreamEntry eventEntry, CancellationToken cancellationToken)
+    public static async Task TryAdvanceEventStreamAsync(this IReadOnlyKuboBasedNomadStorage nomadStorage, KuboNomadEventStreamEntry eventEntry, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -29,7 +30,7 @@ public static class KuboBasedNomadStorageExtensions
             if (eventEntry.Id != ((IHasId)nomadStorage).Id)
                 return;
 
-            var (updateEvent, _) = await nomadStorage.Client.ResolveDagCidAsync<StorageUpdateEvent>(eventEntry.Content, nocache: !nomadStorage.UseCache, cancellationToken);
+            var (updateEvent, _) = await nomadStorage.Client.ResolveDagCidAsync<StorageUpdateEvent>(eventEntry.Content, nocache: !nomadStorage.KuboOptions.UseCache, cancellationToken);
 
             // Prevent non-folder updates.
             if (updateEvent is not FolderUpdateEvent folderUpdateEvent)
@@ -50,7 +51,7 @@ public static class KuboBasedNomadStorageExtensions
             if (eventEntry.Id != ((IHasId)file).Id)
                 return;
 
-            var eventContent = await file.Client.ResolveDagCidAsync<StorageUpdateEvent>(eventEntry.Content, nocache: !file.UseCache, cancellationToken);
+            var eventContent = await file.Client.ResolveDagCidAsync<StorageUpdateEvent>(eventEntry.Content, nocache: !file.KuboOptions.UseCache, cancellationToken);
             var updateEvent = eventContent.Result;
 
             if (updateEvent is not null)
@@ -103,9 +104,9 @@ public static class KuboBasedNomadStorageExtensions
                 Client = nomadFolder.Client,
                 Id = createFolderEvent.StorableItemId,
                 Name = createFolderEvent.StorableItemName,
-                Parent = (ReadOnlyNomadFolder<Cid, NomadEventStream, NomadEventStreamEntry>?)nomadFolder,
+                Parent = (ReadOnlyNomadFolder<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>?)nomadFolder,
                 Sources = nomadFolder.Sources,
-                UseCache = nomadFolder.UseCache,
+                KuboOptions = nomadFolder.KuboOptions,
             };
 
             nomadFolder.Items.Add(newFolder);
@@ -122,8 +123,8 @@ public static class KuboBasedNomadStorageExtensions
                 Name = createFileEvent.StorableItemName,
                 Parent = nomadFolder,
                 Sources = nomadFolder.Sources,
-                UseCache = nomadFolder.UseCache,
                 CurrentContentId = emptyContent.Id,
+                KuboOptions = nomadFolder.KuboOptions,
             };
 
             if (createFileEvent.Overwrite)
@@ -164,48 +165,29 @@ public static class KuboBasedNomadStorageExtensions
         var keys = await client.Key.ListAsync(cancellationToken);
 
         var nomadLocalSourceKey = keys.First(x => x.Name == storage.LocalEventStreamKeyName);
-        var localSource = await nomadLocalSourceKey.Id.ResolveDagCidAsync<NomadEventStream>(client, nocache: !storage.UseCache, cancellationToken);
+        var localSource = await nomadLocalSourceKey.Id.ResolveDagCidAsync<KuboNomadEventStream>(client, nocache: !storage.KuboOptions.UseCache, cancellationToken);
         var localEventStreamContent = localSource.Result;
         Guard.IsNotNull(localEventStreamContent);
 
-        var localUpdateEventCid = await client.Dag.PutAsync(updateEvent, pin: storage.ShouldPin, cancel: cancellationToken);
+        var localUpdateEventCid = await client.Dag.PutAsync(updateEvent, pin: storage.KuboOptions.ShouldPin, cancel: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Get prior local sync event(s) for this peer
-        var localSyncEvents = await localEventStreamContent.Entries.InParallel(x => client.ResolveDagCidAsync<NomadEventStreamEntry>(x, nocache: !storage.UseCache, cancellationToken));
-
-        // Get last known sync event (for linking in the next new event).
-        // Note that PriorContentSyncEntry is not used to walk the entire history of events, but can be used to walk backwards the events performed by a specific peer.
-        // To walk the entire history of events across peers, we use TimestampUtc.
-#if NET5_0_OR_GREATER
-        var lastSyncEventEntry = localSyncEvents
-            .Select(x => x.Result)
-            .MaxBy(x => x?.TimestampUtc);
-#else
-        var lastSyncEventEntry = localSyncEvents
-            .Select(x => x.Result)
-            .OrderByDescending(x => x?.TimestampUtc)
-            .FirstOrDefault();
-#endif
-
         // Append the event to the local event stream.
-        var newEventStreamEntry = new NomadEventStreamEntry
+        var newEventStreamEntry = new KuboNomadEventStreamEntry
         {
             Id = ((IStorableChild)storage).Id,
-            PeerId = peerId.Id,
             TimestampUtc = DateTime.UtcNow,
             Content = localUpdateEventCid,
-            PriorEventStreamEntry = lastSyncEventEntry?.Content,
         };
 
         // Get new cid for new local event stream entry.
-        var newEventStreamEntryCid = await client.Dag.PutAsync(newEventStreamEntry, pin: storage.ShouldPin, cancel: cancellationToken);
+        var newEventStreamEntryCid = await client.Dag.PutAsync(newEventStreamEntry, pin: storage.KuboOptions.ShouldPin, cancel: cancellationToken);
 
         // Add new entry cid to event stream content.
         localEventStreamContent.Entries.Add(newEventStreamEntryCid);
 
         // Get new cid for full local event stream.
-        var localEventStreamCid = await client.Dag.PutAsync(localEventStreamContent, pin: storage.ShouldPin, cancel: cancellationToken);
+        var localEventStreamCid = await client.Dag.PutAsync(localEventStreamContent, pin: storage.KuboOptions.ShouldPin, cancel: cancellationToken);
 
         // Update the local event stream in ipns.
         await client.Name.PublishAsync(localEventStreamCid, storage.LocalEventStreamKeyName, cancel: cancellationToken);

@@ -2,12 +2,14 @@
 using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
-using OwlCore.ComponentModel.Nomad;
+using OwlCore.Nomad;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using OwlCore.Nomad.Kubo;
+using OwlCore.Nomad.Storage;
 using OwlCore.Nomad.Storage.Models;
 
 namespace OwlCore.Kubo.Nomad.Storage;
@@ -15,34 +17,25 @@ namespace OwlCore.Kubo.Nomad.Storage;
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
 /// </summary>
-public class KuboNomadFile : NomadFile<Cid, NomadEventStream, NomadEventStreamEntry>, IModifiableKuboBasedNomadFile
+public class KuboNomadFile : NomadFile<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>, IModifiableKuboBasedNomadFile
 {
     /// <summary>
     /// Creates a new instance of <see cref="KuboNomadFile"/>.
     /// </summary>
     /// <param name="listeningEventStreamHandlers">The shared collection of known event stream targets participating in event seeking.</param>
-    public KuboNomadFile(ICollection<ISharedEventStreamHandler<Cid, NomadEventStream, NomadEventStreamEntry>> listeningEventStreamHandlers)
+    public KuboNomadFile(ICollection<ISharedEventStreamHandler<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>> listeningEventStreamHandlers)
         : base(listeningEventStreamHandlers)
     {
     }
 
-    /// <summary>
-    /// The client to use for communicating with Ipfs.
-    /// </summary>
+    /// <inheritdoc/>
+    public required IKuboOptions KuboOptions { get; set; }
+
+    /// <inheritdoc/>
     public required ICoreApi Client { get; set; }
 
-    /// <summary>
-    /// Whether to pin content added to Ipfs.
-    /// </summary>
-    public bool ShouldPin { get; set; }
-
-    /// <summary>
-    /// Whether to use the cache when resolving Ipns Cids.
-    /// </summary>
-    public bool UseCache { get; set; }
-
-    /// <inheritdoc />
-    public TimeSpan IpnsLifetime { get; set; }
+    /// <inheritdoc/>
+    public required string RoamingKeyName { get; init; }
 
     /// <summary>
     /// The Cid of the content in this file.
@@ -60,7 +53,7 @@ public class KuboNomadFile : NomadFile<Cid, NomadEventStream, NomadEventStreamEn
     }
 
     /// <inheritdoc />
-    public override Task TryAdvanceEventStreamAsync(NomadEventStreamEntry streamEntry, CancellationToken cancellationToken)
+    public override Task TryAdvanceEventStreamAsync(KuboNomadEventStreamEntry streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
         return KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync(this, streamEntry, cancellationToken);

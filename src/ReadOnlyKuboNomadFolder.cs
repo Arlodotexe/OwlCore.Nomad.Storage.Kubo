@@ -1,12 +1,14 @@
 ﻿using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
-using OwlCore.ComponentModel.Nomad;
+using OwlCore.Nomad;
 using OwlCore.Storage;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using OwlCore.Nomad.Kubo;
+using OwlCore.Nomad.Storage;
 using OwlCore.Nomad.Storage.Models;
 
 namespace OwlCore.Kubo.Nomad.Storage;
@@ -14,26 +16,22 @@ namespace OwlCore.Kubo.Nomad.Storage;
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
 /// </summary>
-public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, NomadEventStream, NomadEventStreamEntry>, IReadOnlyKuboBasedNomadFolder
+public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>, IReadOnlyKuboBasedNomadFolder
 {
     /// <summary>
     /// Creates a new instance of <see cref="ReadOnlyKuboNomadFolder"/>.
     /// </summary>
     /// <param name="listeningEventStreamHandlers">The shared collection of known nomad event streams participating in event seeking.</param>
-    public ReadOnlyKuboNomadFolder(ICollection<ISharedEventStreamHandler<Cid, NomadEventStream, NomadEventStreamEntry>> listeningEventStreamHandlers)
+    public ReadOnlyKuboNomadFolder(ICollection<ISharedEventStreamHandler<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>> listeningEventStreamHandlers)
         : base(listeningEventStreamHandlers)
     {
     }
 
-    /// <summary>
-    /// The client to use for communicating with Ipfs.
-    /// </summary>
-    public required ICoreApi Client { get; set; }
+    /// <inheritdoc/>
+    public required IKuboOptions KuboOptions { get; set; }
 
-    /// <summary>
-    /// Whether to use the cache when resolving Ipns Cids.
-    /// </summary>
-    public bool UseCache { get; set; }
+    /// <inheritdoc/>
+    public required ICoreApi Client { get; set; }
 
     /// <summary>
     /// The interval that IPNS should be checked for updates.
@@ -41,7 +39,7 @@ public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, NomadEventStream
     public TimeSpan UpdateCheckInterval { get; } = TimeSpan.FromMinutes(1);
 
     /// <inheritdoc />
-    public override Task TryAdvanceEventStreamAsync(NomadEventStreamEntry streamEntry, CancellationToken cancellationToken)
+    public override Task TryAdvanceEventStreamAsync(KuboNomadEventStreamEntry streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
         return KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync(this, streamEntry, cancellationToken);
