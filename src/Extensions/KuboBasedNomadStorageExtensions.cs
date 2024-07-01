@@ -70,7 +70,7 @@ public static class KuboBasedNomadStorageExtensions
     /// <param name="nomadFile">The file to operate in.</param>
     /// <param name="updateEvent">The event content to apply without side effects.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing task.</param>
-    public static async Task ApplyEntryUpdateAsync(this IReadOnlyKuboBasedNomadFile nomadFile, StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
+    public static Task ApplyEntryUpdateAsync(this IReadOnlyKuboBasedNomadFile nomadFile, StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -84,6 +84,7 @@ public static class KuboBasedNomadStorageExtensions
 
         // Apply file updates
         nomadFile.CurrentContentId = fileUpdateEvent.NewContentId;
+        return Task.CompletedTask;
     }
 
     /// <summary>
