@@ -20,14 +20,14 @@ namespace OwlCore.Kubo.Nomad.Storage;
 public static class KuboBasedNomadStorageExtensions
 {
     /// <inheritdoc cref="IEventStreamHandler{TEventStreamEntry}"/>
-    public static async Task TryAdvanceEventStreamAsync(this IReadOnlyKuboBasedNomadStorage nomadStorage, KuboNomadEventStreamEntry eventEntry, CancellationToken cancellationToken)
+    public static async Task TryAdvanceEventStreamAsync(this IReadOnlyKuboBasedNomadStorage nomadStorage, EventStreamEntry<Cid> eventEntry, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         if (nomadStorage is IReadOnlyKuboBasedNomadFolder folder)
         {
             // Only process event entries for this object.
-            if (eventEntry.Id != ((IHasId)nomadStorage).Id)
+            if (eventEntry.TargetId != ((IHasId)nomadStorage).Id)
                 return;
 
             var (updateEvent, _) = await nomadStorage.Client.ResolveDagCidAsync<StorageUpdateEvent>(eventEntry.Content, nocache: !nomadStorage.KuboOptions.UseCache, cancellationToken);
@@ -48,7 +48,7 @@ public static class KuboBasedNomadStorageExtensions
         if (nomadStorage is IReadOnlyKuboBasedNomadFile file)
         {
             // Ignore events not targeted for this object.
-            if (eventEntry.Id != ((IHasId)file).Id)
+            if (eventEntry.TargetId != ((IHasId)file).Id)
                 return;
 
             var eventContent = await file.Client.ResolveDagCidAsync<StorageUpdateEvent>(eventEntry.Content, nocache: !file.KuboOptions.UseCache, cancellationToken);
@@ -105,7 +105,7 @@ public static class KuboBasedNomadStorageExtensions
                 Client = nomadFolder.Client,
                 Id = createFolderEvent.StorableItemId,
                 Name = createFolderEvent.StorableItemName,
-                Parent = (ReadOnlyNomadFolder<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>?)nomadFolder,
+                Parent = (ReadOnlyNomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>?)nomadFolder,
                 Sources = nomadFolder.Sources,
                 KuboOptions = nomadFolder.KuboOptions,
             };
@@ -166,7 +166,7 @@ public static class KuboBasedNomadStorageExtensions
         var keys = await client.Key.ListAsync(cancellationToken);
 
         var nomadLocalSourceKey = keys.First(x => x.Name == storage.LocalEventStreamKeyName);
-        var localSource = await nomadLocalSourceKey.Id.ResolveDagCidAsync<KuboNomadEventStream>(client, nocache: !storage.KuboOptions.UseCache, cancellationToken);
+        var localSource = await nomadLocalSourceKey.Id.ResolveDagCidAsync<EventStream<Cid>>(client, nocache: !storage.KuboOptions.UseCache, cancellationToken);
         var localEventStreamContent = localSource.Result;
         Guard.IsNotNull(localEventStreamContent);
 
@@ -174,9 +174,10 @@ public static class KuboBasedNomadStorageExtensions
         cancellationToken.ThrowIfCancellationRequested();
 
         // Append the event to the local event stream.
-        var newEventStreamEntry = new KuboNomadEventStreamEntry
+        var newEventStreamEntry = new EventStreamEntry<Cid>()
         {
-            Id = ((IStorableChild)storage).Id,
+            TargetId = ((IStorableChild)storage).Id,
+            EventId = updateEvent.EventId,
             TimestampUtc = DateTime.UtcNow,
             Content = localUpdateEventCid,
         };

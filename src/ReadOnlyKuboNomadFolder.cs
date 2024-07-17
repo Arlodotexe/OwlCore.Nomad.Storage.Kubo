@@ -16,13 +16,13 @@ namespace OwlCore.Kubo.Nomad.Storage;
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
 /// </summary>
-public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>, IReadOnlyKuboBasedNomadFolder
+public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IReadOnlyKuboBasedNomadFolder
 {
     /// <summary>
     /// Creates a new instance of <see cref="ReadOnlyKuboNomadFolder"/>.
     /// </summary>
     /// <param name="listeningEventStreamHandlers">The shared collection of known nomad event streams participating in event seeking.</param>
-    public ReadOnlyKuboNomadFolder(ICollection<ISharedEventStreamHandler<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>> listeningEventStreamHandlers)
+    public ReadOnlyKuboNomadFolder(ICollection<ISharedEventStreamHandler<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> listeningEventStreamHandlers)
         : base(listeningEventStreamHandlers)
     {
     }
@@ -39,7 +39,7 @@ public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, KuboNomadEventSt
     public TimeSpan UpdateCheckInterval { get; } = TimeSpan.FromMinutes(1);
 
     /// <inheritdoc />
-    public override Task TryAdvanceEventStreamAsync(KuboNomadEventStreamEntry streamEntry, CancellationToken cancellationToken)
+    public override Task TryAdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
         return KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync(this, streamEntry, cancellationToken);

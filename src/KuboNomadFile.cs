@@ -17,13 +17,13 @@ namespace OwlCore.Kubo.Nomad.Storage;
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
 /// </summary>
-public class KuboNomadFile : NomadFile<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>, IModifiableKuboBasedNomadFile
+public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableKuboBasedNomadFile
 {
     /// <summary>
     /// Creates a new instance of <see cref="KuboNomadFile"/>.
     /// </summary>
     /// <param name="listeningEventStreamHandlers">The shared collection of known event stream targets participating in event seeking.</param>
-    public KuboNomadFile(ICollection<ISharedEventStreamHandler<Cid, KuboNomadEventStream, KuboNomadEventStreamEntry>> listeningEventStreamHandlers)
+    public KuboNomadFile(ICollection<ISharedEventStreamHandler<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> listeningEventStreamHandlers)
         : base(listeningEventStreamHandlers)
     {
     }
@@ -53,7 +53,7 @@ public class KuboNomadFile : NomadFile<Cid, KuboNomadEventStream, KuboNomadEvent
     }
 
     /// <inheritdoc />
-    public override Task TryAdvanceEventStreamAsync(KuboNomadEventStreamEntry streamEntry, CancellationToken cancellationToken)
+    public override Task TryAdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
         return KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync(this, streamEntry, cancellationToken);
