@@ -1,18 +1,19 @@
-﻿using CommunityToolkit.Diagnostics;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using CommunityToolkit.Diagnostics;
 using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
-using OwlCore.Nomad;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
+using OwlCore.Kubo;
 using OwlCore.Nomad.Kubo;
-using OwlCore.Nomad.Storage;
+using OwlCore.Nomad.Storage.Kubo.Extensions;
 using OwlCore.Nomad.Storage.Models;
 
-namespace OwlCore.Kubo.Nomad.Storage;
+namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
@@ -34,19 +35,19 @@ public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     /// <inheritdoc/>
     public required ICoreApi Client { get; set; }
 
+    /// <summary>
+    /// The name of the local ipns key to publish event stream changes to.
+    /// </summary>
+    public required string LocalEventStreamKeyName { get; init; }
+
     /// <inheritdoc/>
     public required string RoamingKeyName { get; init; }
-
-    /// <summary>
-    /// The Cid of the content in this file.
-    /// </summary>
-    public required Cid? CurrentContentId { get; set; }
 
     /// <inheritdoc />
     public override async Task<Stream> OpenStreamAsync(FileAccess accessMode = FileAccess.Read, CancellationToken cancellationToken = default)
     {
-        Guard.IsNotNull(CurrentContentId);
-        var backingFile = new IpfsFile(CurrentContentId, Client);
+        Guard.IsNotNull(Inner.ContentId);
+        var backingFile = new IpfsFile(Inner.ContentId, Client);
         var sourceStream = await backingFile.OpenStreamAsync(FileAccess.Read, cancellationToken);
 
         return new WritableNomadFileStream(this, sourceStream);
@@ -71,17 +72,18 @@ public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     }
     
     /// <inheritdoc cref="NomadFile{TContentPointer,TEventStreamSource,TEventStreamEntry}.ApplyEntryUpdateAsync" />
-    public override async Task ApplyEntryUpdateAsync(StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
+    public override Task ApplyEntryUpdateAsync(StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
     {
         // Prevent non-folder updates.
-        if (updateEvent is not FileUpdateEvent fileUpdateEvent)
-            throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't a {nameof(FileUpdateEvent)} and cannot be applied to this file.");
+        if (updateEvent is not FileUpdateEvent<Cid> fileUpdateEvent)
+            throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't a {nameof(FileUpdateEvent<Cid>)} and cannot be applied to this file.");
 
         // Prevent updates intended for other files.
         if (fileUpdateEvent.StorableItemId != Id)
             throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't designated for this folder and can't be applied.");
 
         // Apply file updates
-        CurrentContentId = fileUpdateEvent.NewContentId;
+        Inner.ContentId = fileUpdateEvent.NewContentId;
+        return Task.CompletedTask;
     }
 }

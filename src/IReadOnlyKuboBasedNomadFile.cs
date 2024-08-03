@@ -1,15 +1,13 @@
 ﻿using Ipfs;
+using OwlCore.ComponentModel;
+using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage;
 
-namespace OwlCore.Kubo.Nomad.Storage;
+namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
 /// A kubo-based storage interface for files.
 /// </summary>
-public interface IReadOnlyKuboBasedNomadFile : IReadOnlyKuboBasedNomadStorage, IChildFile
+public interface IReadOnlyKuboBasedNomadFile : IReadOnlyKuboBasedNomadStorage, IChildFile, IDelegable<NomadFileData<Cid>>
 {
-    /// <summary>
-    /// The <see cref="Cid"/> that represents the content in this file.
-    /// </summary>
-    public Cid? CurrentContentId { get; set; }
 }

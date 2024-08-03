@@ -1,11 +1,13 @@
-﻿using CommunityToolkit.Common;
-using Ipfs.CoreApi;
-using OwlCore.ComponentModel;
-using System.IO;
+﻿using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using CommunityToolkit.Common;
+using Ipfs;
+using Ipfs.CoreApi;
+using OwlCore.ComponentModel;
+using OwlCore.Nomad.Storage.Models;
 
-namespace OwlCore.Kubo.Nomad.Storage;
+namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
 /// Handles opening and writing a writable file stream for a <see cref="KuboNomadFile"/>.
@@ -45,7 +47,7 @@ public class WritableNomadFileStream : WritableLazySeekStream
 
         var added = await KuboNomadFile.Client.FileSystem.AddAsync(DestinationStream, KuboNomadFile.Name, new AddFileOptions { Pin = KuboNomadFile.KuboOptions.ShouldPin }, cancel: cancellationToken);
 
-        var fileUpdateEvent = new FileUpdateEvent(KuboNomadFile.Id, added.Id);
+        var fileUpdateEvent = new FileUpdateEvent<Cid>(KuboNomadFile.Id, added.Id);
         await KuboNomadFile.AppendNewEntryAsync(fileUpdateEvent, cancellationToken);
     }
 }
