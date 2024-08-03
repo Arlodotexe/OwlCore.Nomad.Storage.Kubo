@@ -1,9 +1,9 @@
-﻿using OwlCore.Kubo.FolderWatchers;
-using System;
+﻿using System;
 using System.Collections.Specialized;
 using System.Threading.Tasks;
+using OwlCore.Kubo.FolderWatchers;
 
-namespace OwlCore.Kubo.Nomad.Storage;
+namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
 /// A timer-based folder watcher that watches a <see cref="ReadOnlyKuboNomadFolder"/>.

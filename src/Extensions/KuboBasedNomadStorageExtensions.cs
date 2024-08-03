@@ -1,18 +1,16 @@
-﻿using CommunityToolkit.Diagnostics;
-using Ipfs;
-using OwlCore.ComponentModel;
-using OwlCore.Nomad;
-using OwlCore.Nomad.Kubo;
-using OwlCore.Nomad.Storage;
-using OwlCore.Nomad.Storage.Models;
-using OwlCore.Storage;
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CommunityToolkit.Diagnostics;
+using Ipfs;
+using OwlCore.ComponentModel;
+using OwlCore.Kubo;
+using OwlCore.Nomad.Storage.Models;
+using OwlCore.Storage;
 
-namespace OwlCore.Kubo.Nomad.Storage;
+namespace OwlCore.Nomad.Storage.Kubo.Extensions;
 
 /// <summary>
 /// Extension methods for <see cref="IModifiableKuboBasedNomadStorage"/> and <see cref="IReadOnlyKuboBasedNomadStorage"/>.
@@ -75,15 +73,15 @@ public static class KuboBasedNomadStorageExtensions
         cancellationToken.ThrowIfCancellationRequested();
 
         // Prevent non-folder updates.
-        if (updateEvent is not FileUpdateEvent fileUpdateEvent)
-            throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't a {nameof(FileUpdateEvent)} and cannot be applied to this file.");
+        if (updateEvent is not FileUpdateEvent<Cid> fileUpdateEvent)
+            throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't a {nameof(FileUpdateEvent<Cid>)} and cannot be applied to this file.");
 
         // Prevent updates intended for other files.
         if (fileUpdateEvent.StorableItemId != ((IStorable)nomadFile).Id)
             throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't designated for this folder and can't be applied.");
 
         // Apply file updates
-        nomadFile.CurrentContentId = fileUpdateEvent.NewContentId;
+        nomadFile.Inner.ContentId = fileUpdateEvent.NewContentId;
         return Task.CompletedTask;
     }
 
@@ -100,49 +98,45 @@ public static class KuboBasedNomadStorageExtensions
         // Apply folder updates
         if (updateEvent is CreateFolderInFolderEvent createFolderEvent)
         {
-            var newFolder = new ReadOnlyKuboNomadFolder(nomadFolder.ListeningEventStreamHandlers)
+            nomadFolder.Inner.Folders.Add(new NomadFolderData<Cid>
             {
-                Client = nomadFolder.Client,
-                Id = createFolderEvent.StorableItemId,
-                Name = createFolderEvent.StorableItemName,
-                Parent = (ReadOnlyNomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>?)nomadFolder,
+                StorableItemName = createFolderEvent.StorableItemName,
+                StorableItemId = createFolderEvent.StorableItemId,
                 Sources = nomadFolder.Sources,
-                KuboOptions = nomadFolder.KuboOptions,
-            };
-
-            nomadFolder.Items.Add(newFolder);
+                Files = [],
+                Folders = [],
+            });
         }
 
         if (updateEvent is CreateFileInFolderEvent createFileEvent)
         {
             var emptyContent = await nomadFolder.Client.FileSystem.AddAsync(new MemoryStream(), cancel: cancellationToken);
 
-            var newFile = new ReadOnlyKuboNomadFile(nomadFolder.ListeningEventStreamHandlers)
-            {
-                Client = nomadFolder.Client,
-                Id = createFileEvent.StorableItemId,
-                Name = createFileEvent.StorableItemName,
-                Parent = nomadFolder,
-                Sources = nomadFolder.Sources,
-                CurrentContentId = emptyContent.Id,
-                KuboOptions = nomadFolder.KuboOptions,
-            };
-
             if (createFileEvent.Overwrite)
-                nomadFolder.Items.RemoveAll(x => x.Id == createFileEvent.StorableItemId || x.Name == createFileEvent.StorableItemName);
+                nomadFolder.Inner.Files.RemoveAll(x => x.StorableItemId == createFileEvent.StorableItemId || x.StorableItemName == createFileEvent.StorableItemName);
 
-            nomadFolder.Items.Add(newFile);
+            nomadFolder.Inner.Files.Add(new NomadFileData<Cid>
+            {
+                ContentId = emptyContent.Id,
+                StorableItemId = createFileEvent.StorableItemId,
+                StorableItemName = createFileEvent.StorableItemName,
+            });
         }
 
         if (updateEvent is DeleteFromFolderEvent deleteEvent)
         {
-            // If file has been deleted, it should already exist in the folder.
-            var item = nomadFolder.Items.FirstOrDefault(x => x.Id == deleteEvent.StorableItemId || x.Name == deleteEvent.StorableItemName);
-
+            // If deleted, it should already exist in the folder.
             // Remove the item if it exists.
             // If it doesn't exist, it may have been removed in another timeline (by another peer).
-            if (item is not null)
-                nomadFolder.Items.Remove(item);
+            // Folders
+            var targetFolder = nomadFolder.Inner.Folders.FirstOrDefault(x => x.StorableItemId == deleteEvent.StorableItemId || x.StorableItemName == deleteEvent.StorableItemName);
+            if (targetFolder is not null)
+                nomadFolder.Inner.Folders.Remove(targetFolder);
+            
+            // Files
+            var targetFile = nomadFolder.Inner.Files.FirstOrDefault(x=> x.StorableItemId == deleteEvent.StorableItemId || deleteEvent.StorableItemName == x.StorableItemName);
+            if (targetFile is not null)
+                nomadFolder.Inner.Files.Remove(targetFile);
         }
     }
 
@@ -193,8 +187,5 @@ public static class KuboBasedNomadStorageExtensions
 
         // Update the local event stream in ipns.
         await client.Name.PublishAsync(localEventStreamCid, storage.LocalEventStreamKeyName, cancel: cancellationToken);
-
-        // Apply new event to current folder without side effects.
-        await storage.ApplyEntryUpdateAsync(updateEvent, cancellationToken);
     }
 }

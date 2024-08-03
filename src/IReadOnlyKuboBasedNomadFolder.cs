@@ -1,7 +1,10 @@
-﻿using OwlCore.Storage;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using Ipfs;
+using OwlCore.ComponentModel;
+using OwlCore.Nomad.Storage.Models;
+using OwlCore.Storage;
 
-namespace OwlCore.Kubo.Nomad.Storage;
+namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
 /// A kubo-based storage interface for folders.
@@ -9,10 +12,6 @@ namespace OwlCore.Kubo.Nomad.Storage;
 /// <remarks>
 /// Primarily use to create extension method helpers between file/folder implementations of the generic base classes.
 /// </remarks>
-public interface IReadOnlyKuboBasedNomadFolder : IReadOnlyKuboBasedNomadStorage, IChildFolder, IMutableFolder
+public interface IReadOnlyKuboBasedNomadFolder : IReadOnlyKuboBasedNomadStorage, IChildFolder, IMutableFolder, IDelegable<NomadFolderData<Cid>>
 {
-    /// <summary>
-    /// The items current in this folder.
-    /// </summary>
-    public List<IStorableChild> Items { get; } 
 }
