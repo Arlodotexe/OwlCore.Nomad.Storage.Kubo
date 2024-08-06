@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Diagnostics;
@@ -65,13 +64,13 @@ public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     /// </summary>
     /// <param name="updateEvent">The storage event to apply.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
-    public override Task AppendNewEntryAsync(StorageUpdateEvent updateEvent, CancellationToken cancellationToken = default)
+    public override Task<EventStreamEntry<Cid>> AppendNewEntryAsync(StorageUpdateEvent updateEvent, CancellationToken cancellationToken = default)
     {
         // Use extension method for code deduplication (can't use inheritance).
         return this.AppendAndPublishNewEntryToEventStreamAsync(updateEvent, cancellationToken);
     }
     
-    /// <inheritdoc cref="NomadFile{TContentPointer,TEventStreamSource,TEventStreamEntry}.ApplyEntryUpdateAsync" />
+    /// <inheritdoc />
     public override Task ApplyEntryUpdateAsync(StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
     {
         // Prevent non-folder updates.

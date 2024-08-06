@@ -14,13 +14,28 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 		<Author>Arlo Godfrey</Author>
-		<Version>0.4.0</Version>
+		<Version>0.5.0</Version>
 		<Product>OwlCore</Product>
 		<Description>A storage implementation powered by shared event sourcing on IPFS.</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
 		<PackageReleaseNotes>
+--- 0.5.0 ---
+[Breaking]
+Inherited and implemented breaking changes from OwlCore.Nomad.Kubo 0.7.1.
+Inherited and implemented breaking changes from OwlCore.Nomad.Storage 0.6.0. 
+KuboNomadFolder.CreateAsync no longer advances the event stream for you before returning.
+
+[Fixes]
+Fixed KuboNomadFolder.EventStreamPosition not updating during certain operations.
+Fixed 'already disposed' exception when flushing WritableNomadFileStream.
+Fixed an issue where KuboNomadFolder.CreateFileAsync wouldn't respect the overwrite parameter.
+Fixed an issue where KuboNomadFolder.CreateFolderAsync wouldn't respect the overwrite parameter.
+
+[New]
+Added KuboNomadFolder.EventStreamEntries. Since subfolders and files share the same events stream as the root folder, this allows us to avoid re-resolving the event stream every time we get or create a child item instance.
+
 --- 0.4.0 ---
 [Breaking]
 Inherited and implemented breaking changes from OwlCore.Nomad.Kubo 0.5.0.
@@ -82,8 +97,8 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
 		<PackageReference Include="OwlCore.Kubo" Version="0.17.1" />
-		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.5.0" />
-		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.5.0" />
+		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.6.0" />
+		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.7.1" />
 		<PackageReference Include="PolySharp" Version="1.14.1">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

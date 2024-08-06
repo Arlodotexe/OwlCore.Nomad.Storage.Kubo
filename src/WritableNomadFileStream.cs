@@ -39,15 +39,23 @@ public class WritableNomadFileStream : WritableLazySeekStream
     /// <inheritdoc/>
     public override async Task FlushAsync(CancellationToken cancellationToken)
     {
-        // After flushing the base, the DestinationStream should contain the contents of the disposed MemoryStream.
-        await base.FlushAsync(cancellationToken);
-
         if (DestinationStream.Position != 0)
             DestinationStream.Seek(0, SeekOrigin.Begin);
+
+        // Seek to end to ensure full memory stream is loaded
+        if (Position != Length)
+            Seek(0, SeekOrigin.End);
+
+        // Copy memory stream to destination.
+        // Will include any writes done below.
+        await MemoryStream.CopyToAsync(DestinationStream);
+        
+        if (DestinationStream.Position != 0)
+            DestinationStream.Position = 0;
 
         var added = await KuboNomadFile.Client.FileSystem.AddAsync(DestinationStream, KuboNomadFile.Name, new AddFileOptions { Pin = KuboNomadFile.KuboOptions.ShouldPin }, cancel: cancellationToken);
 
         var fileUpdateEvent = new FileUpdateEvent<Cid>(KuboNomadFile.Id, added.Id);
-        await KuboNomadFile.AppendNewEntryAsync(fileUpdateEvent, cancellationToken);
+        KuboNomadFile.EventStreamPosition = await KuboNomadFile.AppendNewEntryAsync(fileUpdateEvent, cancellationToken);
     }
 }

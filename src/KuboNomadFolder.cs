@@ -19,7 +19,7 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
 /// </summary>
-public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableKuboBasedNomadFolder, IFlushable
+public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableKuboBasedNomadFolder, IFlushable, ICreateCopyOf
 {
     /// <summary>
     /// Creates a new instance of <see cref="KuboNomadFolder"/>.
@@ -43,6 +43,11 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     public required string RoamingKeyName { get; init; }
 
     /// <summary>
+    /// The resolved event stream entries to use when constructing child files and folders.
+    /// </summary>
+    public ICollection<EventStreamEntry<Cid>> EventStreamEntries { get; init; } = [];
+
+    /// <summary>
     /// The interval that IPNS should be checked for updates.
     /// </summary>
     public TimeSpan UpdateCheckInterval { get; } = TimeSpan.FromMinutes(1);
@@ -52,15 +57,19 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     {
         var storageUpdateEvent = new DeleteFromFolderEvent(Id, item.Id, item.Name);
         await ApplyEntryUpdateAsync(storageUpdateEvent, cancellationToken);
-        await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
+        EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
     }
 
     /// <inheritdoc/>
     public override async Task<IChildFolder> CreateFolderAsync(string name, bool overwrite = false, CancellationToken cancellationToken = default)
     {
+        var existing = Inner.Folders.FirstOrDefault(x => x.StorableItemName == name);
+        if (!overwrite && existing is not null)
+            return await FolderDataToInstanceAsync(existing, cancellationToken);
+
         var storageUpdateEvent = new CreateFolderInFolderEvent(Id, $"{Id}/{name}", name, overwrite);
         await ApplyEntryUpdateAsync(storageUpdateEvent, cancellationToken);
-        await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
+        EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
 
         var folderData = Inner.Folders.First(x => x.StorableItemId == storageUpdateEvent.StorableItemId);
         var folder = await FolderDataToInstanceAsync(folderData, cancellationToken);
@@ -71,9 +80,13 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <inheritdoc/>
     public override async Task<IChildFile> CreateFileAsync(string name, bool overwrite = false, CancellationToken cancellationToken = default)
     {
-        var storageUpdateEvent = new CreateFileInFolderEvent(Id, $"{Id}/{Name}", name, overwrite);
+        var existing = Inner.Files.FirstOrDefault(x => x.StorableItemName == name);
+        if (!overwrite && existing is not null)
+            return await FileDataToInstanceAsync(existing, cancellationToken);
+            
+        var storageUpdateEvent = new CreateFileInFolderEvent(Id, $"{Id}/{name}", name, overwrite);
         await ApplyEntryUpdateAsync(storageUpdateEvent, cancellationToken);
-        await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
+        EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
 
         var fileData = Inner.Files.First(x => x.StorableItemId == storageUpdateEvent.StorableItemId);
         var file = await FileDataToInstanceAsync(fileData, cancellationToken);
@@ -81,10 +94,35 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     }
 
     /// <inheritdoc/>
-    public override Task AppendNewEntryAsync(StorageUpdateEvent updateEvent, CancellationToken cancellationToken = default)
+    public async Task<IChildFile> CreateCopyOfAsync(IFile fileToCopy, bool overwrite, CancellationToken cancellationToken, CreateCopyOfDelegate fallback)
     {
-        // Use extension method to deduplicate code between NomadFile (can't use inheritance).
-        return this.AppendAndPublishNewEntryToEventStreamAsync(updateEvent, cancellationToken);
+        var existing = Inner.Files.FirstOrDefault(x => x.StorableItemName == fileToCopy.Name);
+        if (overwrite && existing is not null)
+        {
+            // Delete before creating.
+            var storageUpdateEvent = new DeleteFromFolderEvent(Id, existing.StorableItemId, existing.StorableItemName);
+            await ApplyEntryUpdateAsync(storageUpdateEvent, cancellationToken);
+            EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
+        }
+        
+        var destinationFile = await CreateFileAsync(fileToCopy.Name, overwrite, cancellationToken);
+        var destinationStream = await destinationFile.OpenWriteAsync(cancellationToken);
+        var sourceStream = await fileToCopy.OpenReadAsync(cancellationToken);
+
+        await sourceStream.CopyToAsync(destinationStream, 81920, cancellationToken);
+        destinationStream.Dispose();
+        sourceStream.Dispose();
+        
+        return destinationFile;
+    }
+
+    /// <inheritdoc/>
+    public override async Task<EventStreamEntry<Cid>> AppendNewEntryAsync(StorageUpdateEvent updateEvent, CancellationToken cancellationToken = default)
+    {
+        // Use extension method for code deduplication (can't use inheritance).
+        var newEntry = await this.AppendAndPublishNewEntryToEventStreamAsync(updateEvent, cancellationToken);
+        EventStreamEntries.Add(newEntry);
+        return newEntry;
     }
 
     /// <inheritdoc/>
@@ -122,9 +160,9 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
 
         // Modifiable data cannot read remote changes from the roaming snapshot.
         // Event stream must be advanced using known sources.
-        await foreach (var _ in file.AdvanceEventStreamToAtLeastAsync(EventStreamPosition.TimestampUtc.Value, cancellationToken))
-        {
-        }
+        // Resolved event stream entries are passed down the same as sources are.
+        foreach (var entry in EventStreamEntries.OrderBy(x => x.TimestampUtc))
+            await file.TryAdvanceEventStreamAsync(entry, cancellationToken);
 
         return file;
     }
@@ -141,19 +179,20 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
             Inner = folderData,
             LocalEventStreamKeyName = LocalEventStreamKeyName,
             RoamingKeyName = RoamingKeyName,
+            EventStreamEntries = EventStreamEntries,
         };
         
         Guard.IsNotNull(EventStreamPosition?.TimestampUtc);
 
         // Modifiable data cannot read remote changes from the roaming snapshot.
         // Event stream must be advanced using known sources.
-        await foreach (var _ in folder.AdvanceEventStreamToAtLeastAsync(EventStreamPosition.TimestampUtc.Value, cancellationToken))
-        {
-        }
+        // Resolved event stream entries are passed down the same as sources are.
+        foreach (var entry in EventStreamEntries.OrderBy(x => x.TimestampUtc))
+            await folder.TryAdvanceEventStreamAsync(entry, cancellationToken);
 
         return folder;
     }
-    
+
     /// <summary>
     /// Creates a new instance of <see cref="KuboNomadFolder"/> using the given parameters.
     /// </summary>
@@ -215,14 +254,8 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
         
         Logger.LogInformation($"Using {folder.Sources.Count} event stream sources:");
         foreach (var source in folder.Sources)
-            Logger.LogInformation(source);   
+            Logger.LogInformation(source);
 
-        await foreach (var entry in folder.AdvanceEventStreamToAtLeastAsync(DateTime.UtcNow, cancellationToken))
-        {
-            Logger.LogInformation($"Advanced event stream handler {folder.Id} with event entry {entry.EventId} {entry.Content}");
-        }
-
-        Logger.LogInformation($"Folder {folder.Id} loaded");
         return folder;
     }
 

@@ -40,7 +40,7 @@ public static class KuboBasedNomadStorageExtensions
 
             await ApplyEntryUpdateAsync(folder, updateEvent, cancellationToken);
 
-            nomadStorage.EventStreamPosition = eventEntry;
+            folder.EventStreamPosition = eventEntry;
         }
 
         if (nomadStorage is IReadOnlyKuboBasedNomadFile file)
@@ -146,15 +146,11 @@ public static class KuboBasedNomadStorageExtensions
     /// <param name="storage">The storage interface to operate on.</param>
     /// <param name="updateEvent">The update event to publish in a new event.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
-    /// <returns></returns>
-    public static async Task AppendAndPublishNewEntryToEventStreamAsync(this IModifiableKuboBasedNomadStorage storage, StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
+    /// <returns>A task containing the new event stream entry.</returns>
+    public static async Task<EventStreamEntry<Cid>> AppendAndPublishNewEntryToEventStreamAsync(this IModifiableKuboBasedNomadStorage storage, StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var client = storage.Client;
-
-        // Get local peer id
-        var peerId = await client.Generic.IdAsync(cancel: cancellationToken);
-        Guard.IsNotNull(peerId?.Id);
 
         // Get local event stream.
         var keys = await client.Key.ListAsync(cancellationToken);
@@ -168,7 +164,7 @@ public static class KuboBasedNomadStorageExtensions
         cancellationToken.ThrowIfCancellationRequested();
 
         // Append the event to the local event stream.
-        var newEventStreamEntry = new EventStreamEntry<Cid>()
+        var newEventStreamEntry = new EventStreamEntry<Cid>
         {
             TargetId = ((IStorableChild)storage).Id,
             EventId = updateEvent.EventId,
@@ -187,5 +183,7 @@ public static class KuboBasedNomadStorageExtensions
 
         // Update the local event stream in ipns.
         await client.Name.PublishAsync(localEventStreamCid, storage.LocalEventStreamKeyName, cancel: cancellationToken);
+
+        return newEventStreamEntry;
     }
 }
