@@ -80,15 +80,21 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <inheritdoc/>
     public override async Task<IChildFile> CreateFileAsync(string name, bool overwrite = false, CancellationToken cancellationToken = default)
     {
-        var existing = Inner.Files.FirstOrDefault(x => x.StorableItemName == name);
-        if (!overwrite && existing is not null)
-            return await FileDataToInstanceAsync(existing, cancellationToken);
-            
         var storageUpdateEvent = new CreateFileInFolderEvent(Id, $"{Id}/{name}", name, overwrite);
         await ApplyEntryUpdateAsync(storageUpdateEvent, cancellationToken);
         EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
+        
+        var existing = Inner.Files.FirstOrDefault(x => x.StorableItemName == name);
+        if (!overwrite && existing is not null)
+            return await FileDataToInstanceAsync(existing, cancellationToken);
 
-        var fileData = Inner.Files.First(x => x.StorableItemId == storageUpdateEvent.StorableItemId);
+        var fileData = new NomadFileData<Cid>
+        {
+            ContentId = null,
+            StorableItemId = storageUpdateEvent.StorableItemId,
+            StorableItemName = storageUpdateEvent.StorableItemName
+        };
+        
         var file = await FileDataToInstanceAsync(fileData, cancellationToken);
         return file;
     }
