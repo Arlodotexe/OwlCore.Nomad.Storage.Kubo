@@ -5,6 +5,7 @@ using CommunityToolkit.Common;
 using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
+using OwlCore.Nomad.Storage.Kubo.Models;
 using OwlCore.Nomad.Storage.Models;
 
 namespace OwlCore.Nomad.Storage.Kubo;
@@ -55,7 +56,10 @@ public class WritableNomadFileStream : WritableLazySeekStream
 
         var added = await KuboNomadFile.Client.FileSystem.AddAsync(DestinationStream, KuboNomadFile.Name, new AddFileOptions { Pin = KuboNomadFile.KuboOptions.ShouldPin }, cancel: cancellationToken);
 
-        var fileUpdateEvent = new FileUpdateEvent<Cid>(KuboNomadFile.Id, added.Id);
-        KuboNomadFile.EventStreamPosition = await KuboNomadFile.AppendNewEntryAsync(fileUpdateEvent, cancellationToken);
+        var fileUpdateEvent = new FileUpdateEvent(KuboNomadFile.Id, added.Id);
+        var appendedEvent = await KuboNomadFile.AppendNewEntryAsync(fileUpdateEvent, cancellationToken);
+        
+        await KuboNomadFile.ApplyEntryUpdateAsync(fileUpdateEvent, cancellationToken);
+        KuboNomadFile.EventStreamPosition = appendedEvent;
     }
 }

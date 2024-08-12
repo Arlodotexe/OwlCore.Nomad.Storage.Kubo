@@ -10,6 +10,7 @@ using OwlCore.ComponentModel;
 using OwlCore.Kubo;
 using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Kubo.Extensions;
+using OwlCore.Nomad.Storage.Kubo.Models;
 using OwlCore.Nomad.Storage.Models;
 
 namespace OwlCore.Nomad.Storage.Kubo;
@@ -55,10 +56,10 @@ public class ReadOnlyKuboNomadFile : ReadOnlyNomadFile<Cid, EventStream<Cid>, Ev
     }
 
     /// <inheritdoc />
-    public override Task TryAdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
+    public override Task AdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        return KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync(this, streamEntry, cancellationToken);
+        return this.TryAdvanceEventStreamAsync(streamEntry, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -73,9 +74,9 @@ public class ReadOnlyKuboNomadFile : ReadOnlyNomadFile<Cid, EventStream<Cid>, Ev
     /// </summary>
     /// <param name="updateEventContent">The event to apply.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
-    public override Task ApplyEntryUpdateAsync(StorageUpdateEvent updateEventContent, CancellationToken cancellationToken)
+    public Task ApplyEntryUpdateAsync(FileUpdateEvent updateEventContent, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        return KuboBasedNomadStorageExtensions.ApplyEntryUpdateAsync(this, updateEventContent, cancellationToken);
+        return this.ApplyFileUpdateAsync(updateEventContent, cancellationToken);
     }
 }

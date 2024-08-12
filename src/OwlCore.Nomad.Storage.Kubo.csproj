@@ -14,13 +14,38 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 		<Author>Arlo Godfrey</Author>
-		<Version>0.5.0</Version>
+		<Version>0.6.0</Version>
 		<Product>OwlCore</Product>
 		<Description>A storage implementation powered by shared event sourcing on IPFS.</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
 		<PackageReleaseNotes>
+--- 0.6.0 ---
+[Breaking]
+Inherited and implemented breaking changes from OwlCore.Nomad.Kubo 0.8.0.
+Inherited and implemented breaking changes from OwlCore.Nomad.Storage 0.7.0.
+Removed IReadOnlyKuboBasedNomadStorage.  
+Removed IModifiableKuboBasedNomadStorage.
+Removed IReadOnlyKuboBasedNomadStorage.
+Overloads for KuboBasedNomadStorageExtensions.ApplyEntryUpdateAsync were split into ApplyFileUpdateAsync and ApplyFolderUpdateAsync.
+Parameters for KuboBasedNomadStorageExtensions.AppendAndPublishNewEntryToEventStreamAsync were updated. IModifiableNomadKuboEventStreamHandler{T} is used instead of IModifiableKuboBasedNomadStorage. updateEventContentCid is passed directly instead of serializing internally. eventId and targetId are passed directly instead of being pulled from the handler.
+
+[New]
+Added Models.FileUpdateEvent.
+Added KuboNomadFile.EventStreamEntries.
+
+[Improvements]
+IModifiableKuboBasedNomadFolder now implements IModifiableNomadKuboEventStreamHandler{FolderUpdateEvent} directly, instead of using IModifiableKuboBasedNomadStorage and polymorphism. 
+IModifiableKuboBasedNomadFile now implements IModifiableNomadKuboEventStreamHandler{FileUpdateEvent} directly, instead of using IModifiableKuboBasedNomadStorage and polymorphism. 
+IReadOnlyKuboBasedNomadFolder now implements IReadOnlyNomadKuboEventStreamHandler{FolderUpdateEvent} directly, instead of using IReadOnlyKuboBasedNomadStorage and polymorphism. 
+IReadOnlyKuboBasedNomadFile now implements IReadOnlyNomadKuboEventStreamHandler{FileUpdateEvent} directly, instead of using IReadOnlyKuboBasedNomadStorage and polymorphism. 
+KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync now uses IReadOnlyNomadKuboEventStreamHandler{T} instead of IReadOnlyKuboBasedNomadStorage.
+Newly created files now internally use a null cid instead of getting a cid representing empty content.
+
+[Fixes]
+Flushing WriteableNomadFileStream now applies the appended event entry to the file.
+
 --- 0.5.0 ---
 [Breaking]
 Inherited and implemented breaking changes from OwlCore.Nomad.Kubo 0.7.1.
@@ -97,8 +122,8 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
 		<PackageReference Include="OwlCore.Kubo" Version="0.17.1" />
-		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.6.0" />
-		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.7.1" />
+		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.7.0" />
+		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.8.0" />
 		<PackageReference Include="PolySharp" Version="1.14.1">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

@@ -7,38 +7,36 @@ using CommunityToolkit.Diagnostics;
 using Ipfs;
 using OwlCore.ComponentModel;
 using OwlCore.Kubo;
+using OwlCore.Nomad.Kubo;
+using OwlCore.Nomad.Storage.Kubo.Models;
 using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage;
 
 namespace OwlCore.Nomad.Storage.Kubo.Extensions;
 
 /// <summary>
-/// Extension methods for <see cref="IModifiableKuboBasedNomadStorage"/> and <see cref="IReadOnlyKuboBasedNomadStorage"/>.
+/// Extension methods for kubo-based nomad storage implementations.
 /// </summary>
 public static class KuboBasedNomadStorageExtensions
 {
     /// <inheritdoc cref="IEventStreamHandler{TEventStreamEntry}"/>
-    public static async Task TryAdvanceEventStreamAsync(this IReadOnlyKuboBasedNomadStorage nomadStorage, EventStreamEntry<Cid> eventEntry, CancellationToken cancellationToken)
+    public static async Task TryAdvanceEventStreamAsync<T>(this IReadOnlyNomadKuboEventStreamHandler<T> nomadStorage, EventStreamEntry<Cid> eventEntry, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         if (nomadStorage is IReadOnlyKuboBasedNomadFolder folder)
         {
             // Only process event entries for this object.
-            if (eventEntry.TargetId != ((IHasId)nomadStorage).Id)
-                return;
+            if (eventEntry.TargetId != folder.Id)
+                throw new InvalidOperationException($"The provided {nameof(eventEntry)} isn't designated for this folder and can't be applied.");
 
-            var (updateEvent, _) = await nomadStorage.Client.ResolveDagCidAsync<StorageUpdateEvent>(eventEntry.Content, nocache: !nomadStorage.KuboOptions.UseCache, cancellationToken);
-
-            // Prevent non-folder updates.
-            if (updateEvent is not FolderUpdateEvent folderUpdateEvent)
-                throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't a {nameof(FolderUpdateEvent)} and cannot be applied to this folder.");
+            var (updateEvent, _) = await nomadStorage.Client.ResolveDagCidAsync<FolderUpdateEvent>(eventEntry.Content, nocache: !nomadStorage.KuboOptions.UseCache, cancellationToken);
 
             // Prevent updates intended for other folders.
-            if (folderUpdateEvent.WorkingFolderId != ((IStorable)nomadStorage).Id)
+            if (updateEvent?.WorkingFolderId != ((IStorable)nomadStorage).Id)
                 throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't designated for this folder and can't be applied.");
 
-            await ApplyEntryUpdateAsync(folder, updateEvent, cancellationToken);
+            await ApplyFolderUpdateAsync(folder, updateEvent, cancellationToken);
 
             folder.EventStreamPosition = eventEntry;
         }
@@ -46,15 +44,15 @@ public static class KuboBasedNomadStorageExtensions
         if (nomadStorage is IReadOnlyKuboBasedNomadFile file)
         {
             // Ignore events not targeted for this object.
-            if (eventEntry.TargetId != ((IHasId)file).Id)
+            if (eventEntry.TargetId != file.Id)
                 return;
 
-            var eventContent = await file.Client.ResolveDagCidAsync<StorageUpdateEvent>(eventEntry.Content, nocache: !file.KuboOptions.UseCache, cancellationToken);
+            var eventContent = await file.Client.ResolveDagCidAsync<FileUpdateEvent>(eventEntry.Content, nocache: !file.KuboOptions.UseCache, cancellationToken);
             var updateEvent = eventContent.Result;
 
             if (updateEvent is not null)
             {
-                await ApplyEntryUpdateAsync(file, updateEvent, cancellationToken);
+                await ApplyFileUpdateAsync(file, updateEvent, cancellationToken);
 
                 // Update the event stream position.
                 file.EventStreamPosition = eventEntry;
@@ -68,20 +66,16 @@ public static class KuboBasedNomadStorageExtensions
     /// <param name="nomadFile">The file to operate in.</param>
     /// <param name="updateEvent">The event content to apply without side effects.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing task.</param>
-    public static Task ApplyEntryUpdateAsync(this IReadOnlyKuboBasedNomadFile nomadFile, StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
+    public static Task ApplyFileUpdateAsync(this IReadOnlyKuboBasedNomadFile nomadFile, FileUpdateEvent updateEvent, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Prevent non-folder updates.
-        if (updateEvent is not FileUpdateEvent<Cid> fileUpdateEvent)
-            throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't a {nameof(FileUpdateEvent<Cid>)} and cannot be applied to this file.");
-
         // Prevent updates intended for other files.
-        if (fileUpdateEvent.StorableItemId != ((IStorable)nomadFile).Id)
+        if (updateEvent.StorableItemId != nomadFile.Id)
             throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't designated for this folder and can't be applied.");
 
         // Apply file updates
-        nomadFile.Inner.ContentId = fileUpdateEvent.NewContentId;
+        nomadFile.Inner.ContentId = updateEvent.NewContentId;
         return Task.CompletedTask;
     }
 
@@ -91,7 +85,7 @@ public static class KuboBasedNomadStorageExtensions
     /// <param name="nomadFolder">The folder to operate in.</param>
     /// <param name="updateEvent">The event content to apply without side effects.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing task.</param>
-    public static async Task ApplyEntryUpdateAsync(this IReadOnlyKuboBasedNomadFolder nomadFolder, StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
+    public static Task ApplyFolderUpdateAsync(this IReadOnlyKuboBasedNomadFolder nomadFolder, FolderUpdateEvent updateEvent, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -110,14 +104,12 @@ public static class KuboBasedNomadStorageExtensions
 
         if (updateEvent is CreateFileInFolderEvent createFileEvent)
         {
-            var emptyContent = await nomadFolder.Client.FileSystem.AddAsync(new MemoryStream(), cancel: cancellationToken);
-
             if (createFileEvent.Overwrite)
                 nomadFolder.Inner.Files.RemoveAll(x => x.StorableItemId == createFileEvent.StorableItemId || x.StorableItemName == createFileEvent.StorableItemName);
 
             nomadFolder.Inner.Files.Add(new NomadFileData<Cid>
             {
-                ContentId = emptyContent.Id,
+                ContentId = null,
                 StorableItemId = createFileEvent.StorableItemId,
                 StorableItemName = createFileEvent.StorableItemName,
             });
@@ -138,51 +130,53 @@ public static class KuboBasedNomadStorageExtensions
             if (targetFile is not null)
                 nomadFolder.Inner.Files.Remove(targetFile);
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>
     /// Appends a new event to the event stream and publishes it to ipns.
     /// </summary>
-    /// <param name="storage">The storage interface to operate on.</param>
-    /// <param name="updateEvent">The update event to publish in a new event.</param>
+    /// <param name="handler">The storage interface to operate on.</param>
+    /// <param name="updateEventContentCid">The CID to use for the content of this update event.</param>
+    /// <param name="eventId">A unique identifier for this event type.</param>
+    /// <param name="targetId">A unique identifier for the provided <paramref name="handler"/> that can be used to reapply the event later.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
     /// <returns>A task containing the new event stream entry.</returns>
-    public static async Task<EventStreamEntry<Cid>> AppendAndPublishNewEntryToEventStreamAsync(this IModifiableKuboBasedNomadStorage storage, StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
+    public static async Task<EventStreamEntry<Cid>> AppendAndPublishNewEntryToEventStreamAsync<T>(this IModifiableNomadKuboEventStreamHandler<T> handler, Cid updateEventContentCid, string eventId, string targetId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var client = storage.Client;
+        var client = handler.Client;
 
         // Get local event stream.
         var keys = await client.Key.ListAsync(cancellationToken);
 
-        var nomadLocalSourceKey = keys.First(x => x.Name == storage.LocalEventStreamKeyName);
-        var localSource = await nomadLocalSourceKey.Id.ResolveDagCidAsync<EventStream<Cid>>(client, nocache: !storage.KuboOptions.UseCache, cancellationToken);
-        var localEventStreamContent = localSource.Result;
+        var nomadLocalSourceKey = keys.First(x => x.Name == handler.LocalEventStreamKeyName);
+        var (localEventStreamContent, _) = await nomadLocalSourceKey.Id.ResolveDagCidAsync<EventStream<Cid>>(client, nocache: !handler.KuboOptions.UseCache, cancellationToken);
         Guard.IsNotNull(localEventStreamContent);
-
-        var localUpdateEventCid = await client.Dag.PutAsync(updateEvent, pin: storage.KuboOptions.ShouldPin, cancel: cancellationToken);
+        
         cancellationToken.ThrowIfCancellationRequested();
 
         // Append the event to the local event stream.
         var newEventStreamEntry = new EventStreamEntry<Cid>
         {
-            TargetId = ((IStorableChild)storage).Id,
-            EventId = updateEvent.EventId,
+            TargetId = targetId,
+            EventId = eventId,
             TimestampUtc = DateTime.UtcNow,
-            Content = localUpdateEventCid,
+            Content = updateEventContentCid,
         };
 
         // Get new cid for new local event stream entry.
-        var newEventStreamEntryCid = await client.Dag.PutAsync(newEventStreamEntry, pin: storage.KuboOptions.ShouldPin, cancel: cancellationToken);
+        var newEventStreamEntryCid = await client.Dag.PutAsync(newEventStreamEntry, pin: handler.KuboOptions.ShouldPin, cancel: cancellationToken);
 
         // Add new entry cid to event stream content.
         localEventStreamContent.Entries.Add(newEventStreamEntryCid);
 
         // Get new cid for full local event stream.
-        var localEventStreamCid = await client.Dag.PutAsync(localEventStreamContent, pin: storage.KuboOptions.ShouldPin, cancel: cancellationToken);
+        var localEventStreamCid = await client.Dag.PutAsync(localEventStreamContent, pin: handler.KuboOptions.ShouldPin, cancel: cancellationToken);
 
         // Update the local event stream in ipns.
-        await client.Name.PublishAsync(localEventStreamCid, storage.LocalEventStreamKeyName, cancel: cancellationToken);
+        await client.Name.PublishAsync(localEventStreamCid, handler.LocalEventStreamKeyName, cancel: cancellationToken);
 
         return newEventStreamEntry;
     }

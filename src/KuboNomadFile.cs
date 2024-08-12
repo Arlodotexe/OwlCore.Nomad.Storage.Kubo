@@ -10,7 +10,7 @@ using OwlCore.ComponentModel;
 using OwlCore.Kubo;
 using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Kubo.Extensions;
-using OwlCore.Nomad.Storage.Models;
+using OwlCore.Nomad.Storage.Kubo.Models;
 
 namespace OwlCore.Nomad.Storage.Kubo;
 
@@ -42,10 +42,18 @@ public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     /// <inheritdoc/>
     public required string RoamingKeyName { get; init; }
 
+    /// <summary>
+    /// The resolved event stream entries to use when constructing child files and folders.
+    /// </summary>
+    public required ICollection<EventStreamEntry<Cid>> EventStreamEntries { get; init; }
+
     /// <inheritdoc />
     public override async Task<Stream> OpenStreamAsync(FileAccess accessMode = FileAccess.Read, CancellationToken cancellationToken = default)
     {
-        Guard.IsNotNull(Inner.ContentId);
+            // Handle empty/new file.
+        if (Inner.ContentId is null)
+            return new WritableNomadFileStream(this, new MemoryStream());
+        
         var backingFile = new IpfsFile(Inner.ContentId, Client);
         var sourceStream = await backingFile.OpenStreamAsync(FileAccess.Read, cancellationToken);
 
@@ -53,10 +61,10 @@ public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     }
 
     /// <inheritdoc />
-    public override Task TryAdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
+    public override Task AdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        return KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync(this, streamEntry, cancellationToken);
+        return this.TryAdvanceEventStreamAsync(streamEntry, cancellationToken);
     }
 
     /// <summary>
@@ -64,25 +72,31 @@ public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     /// </summary>
     /// <param name="updateEvent">The storage event to apply.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
-    public override Task<EventStreamEntry<Cid>> AppendNewEntryAsync(StorageUpdateEvent updateEvent, CancellationToken cancellationToken = default)
+    public async Task<EventStreamEntry<Cid>> AppendNewEntryAsync(FileUpdateEvent updateEvent, CancellationToken cancellationToken = default)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        return this.AppendAndPublishNewEntryToEventStreamAsync(updateEvent, cancellationToken);
-    }
-    
-    /// <inheritdoc />
-    public override Task ApplyEntryUpdateAsync(StorageUpdateEvent updateEvent, CancellationToken cancellationToken)
-    {
-        // Prevent non-folder updates.
-        if (updateEvent is not FileUpdateEvent<Cid> fileUpdateEvent)
-            throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't a {nameof(FileUpdateEvent<Cid>)} and cannot be applied to this file.");
+        var localUpdateEventCid = await Client.Dag.PutAsync(updateEvent, pin: KuboOptions.ShouldPin, cancel: cancellationToken);
 
+        var newEntry = await this.AppendAndPublishNewEntryToEventStreamAsync(localUpdateEventCid, updateEvent.EventId, targetId: Id, cancellationToken);
+        EventStreamEntries.Add(newEntry);
+        return newEntry;
+    }
+
+    /// <summary>
+    /// Applies the given event entry
+    /// </summary>
+    /// <param name="updateEvent"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    public Task ApplyEntryUpdateAsync(FileUpdateEvent updateEvent, CancellationToken cancellationToken)
+    {
         // Prevent updates intended for other files.
-        if (fileUpdateEvent.StorableItemId != Id)
+        if (updateEvent.StorableItemId != Id)
             throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't designated for this folder and can't be applied.");
 
         // Apply file updates
-        Inner.ContentId = fileUpdateEvent.NewContentId;
+        Inner.ContentId = updateEvent.NewContentId;
         return Task.CompletedTask;
     }
 }

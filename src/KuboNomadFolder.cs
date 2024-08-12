@@ -117,26 +117,27 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     }
 
     /// <inheritdoc/>
-    public override async Task<EventStreamEntry<Cid>> AppendNewEntryAsync(StorageUpdateEvent updateEvent, CancellationToken cancellationToken = default)
+    public override async Task<EventStreamEntry<Cid>> AppendNewEntryAsync(FolderUpdateEvent updateEvent, CancellationToken cancellationToken = default)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        var newEntry = await this.AppendAndPublishNewEntryToEventStreamAsync(updateEvent, cancellationToken);
+        var localUpdateEventCid = await Client.Dag.PutAsync(updateEvent, pin: KuboOptions.ShouldPin, cancel: cancellationToken);
+        var newEntry = await this.AppendAndPublishNewEntryToEventStreamAsync(localUpdateEventCid, updateEvent.EventId, targetId: Id, cancellationToken);
         EventStreamEntries.Add(newEntry);
         return newEntry;
     }
 
     /// <inheritdoc/>
-    public Task ApplyEntryUpdateAsync(StorageUpdateEvent updateEventContent, CancellationToken cancellationToken)
+    public Task ApplyEntryUpdateAsync(FolderUpdateEvent updateEventContent, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        return KuboBasedNomadStorageExtensions.ApplyEntryUpdateAsync(this, updateEventContent, cancellationToken);
+        return this.ApplyFolderUpdateAsync(updateEventContent, cancellationToken);
     }
 
     /// <inheritdoc />
-    public override Task TryAdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
+    public override Task AdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        return KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync(this, streamEntry, cancellationToken);
+        return this.TryAdvanceEventStreamAsync(streamEntry, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -154,6 +155,8 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
             Inner = fileData,
             LocalEventStreamKeyName = LocalEventStreamKeyName,
             RoamingKeyName = RoamingKeyName,
+            EventStreamId = EventStreamId,
+            EventStreamEntries = EventStreamEntries,
         };
         
         Guard.IsNotNull(EventStreamPosition?.TimestampUtc);
@@ -161,8 +164,8 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
         // Modifiable data cannot read remote changes from the roaming snapshot.
         // Event stream must be advanced using known sources.
         // Resolved event stream entries are passed down the same as sources are.
-        foreach (var entry in EventStreamEntries.OrderBy(x => x.TimestampUtc))
-            await file.TryAdvanceEventStreamAsync(entry, cancellationToken);
+        foreach (var entry in EventStreamEntries.ToArray().OrderBy(x => x.TimestampUtc).Where(x=> x.TargetId == file.Id))
+            await file.AdvanceEventStreamAsync(entry, cancellationToken);
 
         return file;
     }
@@ -180,6 +183,7 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
             LocalEventStreamKeyName = LocalEventStreamKeyName,
             RoamingKeyName = RoamingKeyName,
             EventStreamEntries = EventStreamEntries,
+            EventStreamId = EventStreamId,
         };
         
         Guard.IsNotNull(EventStreamPosition?.TimestampUtc);
@@ -187,8 +191,8 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
         // Modifiable data cannot read remote changes from the roaming snapshot.
         // Event stream must be advanced using known sources.
         // Resolved event stream entries are passed down the same as sources are.
-        foreach (var entry in EventStreamEntries.OrderBy(x => x.TimestampUtc))
-            await folder.TryAdvanceEventStreamAsync(entry, cancellationToken);
+        foreach (var entry in EventStreamEntries.ToArray().OrderBy(x => x.TimestampUtc).Where(x=> x.TargetId == folder.Id))
+            await folder.AdvanceEventStreamAsync(entry, cancellationToken);
 
         return folder;
     }
@@ -222,13 +226,14 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
 
         var folder = new KuboNomadFolder(sharedEventStreamHandlers)
         {
-            Parent = null,
+            EventStreamId = roamingIpnsKey,
+            LocalEventStreamKeyName = localEventStreamKeyName,
+            RoamingKeyName = importedRoamingKey.Name,
             Sources = publishedData.Sources,
             Inner = publishedData,
             Client = client,
             KuboOptions = kuboOptions,
-            RoamingKeyName = importedRoamingKey.Name,
-            LocalEventStreamKeyName = localEventStreamKeyName,
+            Parent = null,
         };
 
         // Add local event stream source, if exists and needed
@@ -270,6 +275,6 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
         if (root is null)
             root = this;
         
-        await root.PublishRoamingAsync<KuboNomadFolder, StorageUpdateEvent, NomadFolderData<Cid>>(cancellationToken);
+        await root.PublishRoamingAsync<KuboNomadFolder, FolderUpdateEvent, NomadFolderData<Cid>>(cancellationToken);
     }
 }

@@ -42,7 +42,7 @@ public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, EventStream<Cid>
     public TimeSpan UpdateCheckInterval { get; } = TimeSpan.FromMinutes(1);
 
     /// <inheritdoc />
-    public override Task TryAdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
+    public override Task AdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
         return KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync(this, streamEntry, cancellationToken);
@@ -53,10 +53,10 @@ public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, EventStream<Cid>
     /// </summary>
     /// <param name="updateEventContent">The event to apply.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
-    public Task ApplyEntryUpdateAsync(StorageUpdateEvent updateEventContent, CancellationToken cancellationToken)
+    public Task ApplyEntryUpdateAsync(FolderUpdateEvent updateEventContent, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        return KuboBasedNomadStorageExtensions.ApplyEntryUpdateAsync(this, updateEventContent, cancellationToken);
+        return KuboBasedNomadStorageExtensions.ApplyFolderUpdateAsync(this, updateEventContent, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -72,6 +72,7 @@ public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, EventStream<Cid>
             Sources = Sources,
             Client = Client,
             KuboOptions = KuboOptions,
+            EventStreamId = EventStreamId,
         };
         
         // Event stream doesn't need to be advanced for read only data. The Inner fileData should have the current state.
@@ -88,6 +89,7 @@ public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, EventStream<Cid>
             Sources = Sources,
             Client = Client,
             KuboOptions = KuboOptions,
+            EventStreamId = EventStreamId,
         };
 
         // Event stream doesn't need to be advanced for read only data. The Inner folderData should have the current state.
@@ -114,8 +116,9 @@ public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, EventStream<Cid>
 
         var folder = new ReadOnlyKuboNomadFolder(sharedEventStreamHandlers)
         {
-            Parent = null,
+            EventStreamId = roamingIpnsKey,
             Sources = publishedData.Sources,
+            Parent = null,
             Inner = publishedData,
             Client = client,
             KuboOptions = kuboOptions,
