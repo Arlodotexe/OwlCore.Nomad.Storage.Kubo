@@ -11,7 +11,6 @@ using OwlCore.Kubo;
 using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Kubo.Extensions;
 using OwlCore.Nomad.Storage.Kubo.Models;
-using OwlCore.Nomad.Storage.Models;
 
 namespace OwlCore.Nomad.Storage.Kubo;
 

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using CommunityToolkit.Diagnostics;
 using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
@@ -50,7 +49,7 @@ public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     /// <inheritdoc />
     public override async Task<Stream> OpenStreamAsync(FileAccess accessMode = FileAccess.Read, CancellationToken cancellationToken = default)
     {
-            // Handle empty/new file.
+        // Handle empty/new file.
         if (Inner.ContentId is null)
             return new WritableNomadFileStream(this, new MemoryStream());
         

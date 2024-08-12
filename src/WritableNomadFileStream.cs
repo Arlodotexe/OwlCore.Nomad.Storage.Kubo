@@ -2,11 +2,9 @@
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Common;
-using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
 using OwlCore.Nomad.Storage.Kubo.Models;
-using OwlCore.Nomad.Storage.Models;
 
 namespace OwlCore.Nomad.Storage.Kubo;
 

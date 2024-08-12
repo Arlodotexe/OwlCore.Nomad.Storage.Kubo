@@ -14,13 +14,18 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 		<Author>Arlo Godfrey</Author>
-		<Version>0.6.0</Version>
+		<Version>0.6.1</Version>
 		<Product>OwlCore</Product>
 		<Description>A storage implementation powered by shared event sourcing on IPFS.</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
 		<PackageReleaseNotes>
+--- 0.6.1 ---
+[Fixes]
+IModifiableKuboBasedNomadFile now inherits IReadOnlyKuboBasedNomadFile, fixing an issue where KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync wouldn't advance the stream for modifiable files.
+IModifiableKuboBasedNomadFolder now inherits IReadOnlyKuboBasedNomadFolder, fixing an issue where KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync wouldn't advance the stream for modifiable folders.
+
 --- 0.6.0 ---
 [Breaking]
 Inherited and implemented breaking changes from OwlCore.Nomad.Kubo 0.8.0.

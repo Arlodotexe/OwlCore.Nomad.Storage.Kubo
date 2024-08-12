@@ -1,11 +1,9 @@
 ﻿using System;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Diagnostics;
 using Ipfs;
-using OwlCore.ComponentModel;
 using OwlCore.Kubo;
 using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Kubo.Models;
