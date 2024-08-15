@@ -63,40 +63,23 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <inheritdoc/>
     public override async Task<IChildFolder> CreateFolderAsync(string name, bool overwrite = false, CancellationToken cancellationToken = default)
     {
-        var existing = Inner.Folders.FirstOrDefault(x => x.StorableItemName == name);
-        if (!overwrite && existing is not null)
-            return await FolderDataToInstanceAsync(existing, cancellationToken);
-
         var storageUpdateEvent = new CreateFolderInFolderEvent(Id, $"{Id}/{name}", name, overwrite);
-        await ApplyEntryUpdateAsync(storageUpdateEvent, cancellationToken);
+        var createdFolderData = (NomadFolderData<Cid>?)await this.ApplyFolderUpdateAsync(storageUpdateEvent, cancellationToken);
         EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
 
-        var folderData = Inner.Folders.First(x => x.StorableItemId == storageUpdateEvent.StorableItemId);
-        var folder = await FolderDataToInstanceAsync(folderData, cancellationToken);
-        
-        return folder;
+        Guard.IsNotNull(createdFolderData);
+        return await FolderDataToInstanceAsync(createdFolderData, cancellationToken);
     }
 
     /// <inheritdoc/>
     public override async Task<IChildFile> CreateFileAsync(string name, bool overwrite = false, CancellationToken cancellationToken = default)
     {
         var storageUpdateEvent = new CreateFileInFolderEvent(Id, $"{Id}/{name}", name, overwrite);
-        await ApplyEntryUpdateAsync(storageUpdateEvent, cancellationToken);
+        var createdFileData = (NomadFileData<Cid>?)await this.ApplyFolderUpdateAsync(storageUpdateEvent, cancellationToken);
         EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
-        
-        var existing = Inner.Files.FirstOrDefault(x => x.StorableItemName == name);
-        if (!overwrite && existing is not null)
-            return await FileDataToInstanceAsync(existing, cancellationToken);
 
-        var fileData = new NomadFileData<Cid>
-        {
-            ContentId = null,
-            StorableItemId = storageUpdateEvent.StorableItemId,
-            StorableItemName = storageUpdateEvent.StorableItemName
-        };
-        
-        var file = await FileDataToInstanceAsync(fileData, cancellationToken);
-        return file;
+        Guard.IsNotNull(createdFileData);
+        return await FileDataToInstanceAsync(createdFileData, cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -135,8 +118,14 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <inheritdoc/>
     public Task ApplyEntryUpdateAsync(FolderUpdateEvent updateEventContent, CancellationToken cancellationToken)
     {
-        // Use extension method for code deduplication (can't use inheritance).
-        return this.ApplyFolderUpdateAsync(updateEventContent, cancellationToken);
+        // Use extension methods for code deduplication (can't use inheritance).
+        return updateEventContent switch
+        {
+            CreateFileInFolderEvent createFileInFolderEvent => this.ApplyFolderUpdateAsync(createFileInFolderEvent, cancellationToken),
+            CreateFolderInFolderEvent createFolderInFolderEvent => this.ApplyFolderUpdateAsync(createFolderInFolderEvent, cancellationToken),
+            DeleteFromFolderEvent deleteFromFolderEvent => this.ApplyFolderUpdateAsync(deleteFromFolderEvent, cancellationToken),
+            _ => throw new ArgumentOutOfRangeException($"Unhandled {nameof(FolderUpdateEvent)} type {updateEventContent.GetType()}."),
+        };
     }
 
     /// <inheritdoc />

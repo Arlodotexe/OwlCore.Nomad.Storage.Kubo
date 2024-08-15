@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using CommunityToolkit.Common;
+using CommunityToolkit.Diagnostics;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
 using OwlCore.Nomad.Storage.Kubo.Models;
@@ -32,7 +32,7 @@ public class WritableNomadFileStream : WritableLazySeekStream
     /// <inheritdoc/>
     public override void Flush()
     {
-        FlushAsync().GetResultOrDefault();
+        FlushAsync().Wait();
     }
 
     /// <inheritdoc/>
@@ -48,16 +48,34 @@ public class WritableNomadFileStream : WritableLazySeekStream
         // Copy memory stream to destination.
         // Will include any writes done below.
         await MemoryStream.CopyToAsync(DestinationStream);
-        
+
         if (DestinationStream.Position != 0)
             DestinationStream.Position = 0;
 
-        var added = await KuboNomadFile.Client.FileSystem.AddAsync(DestinationStream, KuboNomadFile.Name, new AddFileOptions { Pin = KuboNomadFile.KuboOptions.ShouldPin }, cancel: cancellationToken);
+        // Calculate hash first
+        var addFileOptions = new AddFileOptions { Pin = false, OnlyHash = true };
+        var added = await KuboNomadFile.Client.FileSystem.AddAsync(DestinationStream, KuboNomadFile.Name, addFileOptions, cancellationToken);
+
+        // Only append update event if content has changed.
+        if (added.Id == KuboNomadFile.Inner.ContentId)
+            return;
+
+        // Reset destination stream for re-read.
+        if (DestinationStream.Position != 0)
+            DestinationStream.Position = 0;
+        
+        addFileOptions.Pin = KuboNomadFile.KuboOptions.ShouldPin;
+        addFileOptions.OnlyHash = false;
+
+        // Add to filesystem for keeps.
+        added = await KuboNomadFile.Client.FileSystem.AddAsync(DestinationStream, KuboNomadFile.Name, addFileOptions, cancellationToken);
 
         var fileUpdateEvent = new FileUpdateEvent(KuboNomadFile.Id, added.Id);
+        await KuboNomadFile.ApplyEntryUpdateAsync(fileUpdateEvent, cancellationToken);
         var appendedEvent = await KuboNomadFile.AppendNewEntryAsync(fileUpdateEvent, cancellationToken);
         
-        await KuboNomadFile.ApplyEntryUpdateAsync(fileUpdateEvent, cancellationToken);
+        Guard.IsNotNull(KuboNomadFile.Inner.ContentId);
+        Guard.IsEqualTo(KuboNomadFile.Inner.ContentId, fileUpdateEvent.NewContentId);
         KuboNomadFile.EventStreamPosition = appendedEvent;
     }
 }

@@ -44,7 +44,7 @@ public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, EventStream<Cid>
     public override Task AdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        return KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync(this, streamEntry, cancellationToken);
+        return this.TryAdvanceEventStreamAsync(streamEntry, cancellationToken);
     }
 
     /// <summary>
@@ -55,7 +55,13 @@ public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, EventStream<Cid>
     public Task ApplyEntryUpdateAsync(FolderUpdateEvent updateEventContent, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        return KuboBasedNomadStorageExtensions.ApplyFolderUpdateAsync(this, updateEventContent, cancellationToken);
+        return updateEventContent switch
+        {
+            CreateFileInFolderEvent createFileInFolderEvent => this.ApplyFolderUpdateAsync(createFileInFolderEvent, cancellationToken),
+            CreateFolderInFolderEvent createFolderInFolderEvent => this.ApplyFolderUpdateAsync(createFolderInFolderEvent, cancellationToken),
+            DeleteFromFolderEvent deleteFromFolderEvent => this.ApplyFolderUpdateAsync(deleteFromFolderEvent, cancellationToken),
+            _ => throw new ArgumentOutOfRangeException($"Unhandled {nameof(FolderUpdateEvent)} type {updateEventContent.GetType()}."),
+        };
     }
 
     /// <inheritdoc />

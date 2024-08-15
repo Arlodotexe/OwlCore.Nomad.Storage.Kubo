@@ -14,13 +14,26 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 		<Author>Arlo Godfrey</Author>
-		<Version>0.6.2</Version>
+		<Version>0.7.0</Version>
 		<Product>OwlCore</Product>
 		<Description>A storage implementation powered by shared event sourcing on IPFS.</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
 		<PackageReleaseNotes>
+--- 0.7.0 ---
+[Fixes]
+Fixed an issue where calling AppendAndPublishNewEntryToEventStreamAsync with concurrency could have caused data to be lost.
+Fixed an issue where an empty CID was applied to the file on pull, despite not appearing in the event stream. Folder and file creation now properly return existing data when overwrite is false. 
+Fixed an issue where some file streams weren't being consistently flushed. WritableNomadFileStream.Flush now properly waits for the underlying task to complete.
+
+[Improvements]
+KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync now consistently throws when a mismatch event and storage id are provided.
+KuboBasedNomadStorageExtensions.TryAdvanceEventStreamAsync now uses separate overloads instead of a single method with a type check.
+KuboBasedNomadStorageExtensions.ApplyFolderUpdateAsync now uses separate overloads instead of a single method with a type check.
+Flushing WritableNomadFileStream now hashes the data and compares the CID without pinning before deciding to copy/pin to ipfs.
+Additional guards and check when flushing WritableNomadFileStream.
+
 --- 0.6.2 ---
 [Fixes]
 Fixed an issue where KuboNomadFolder.CreateFileAsync wasn't returning an empty file when overwrite: true was provided and the file exists.
