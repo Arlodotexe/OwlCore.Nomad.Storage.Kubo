@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Diagnostics;
 using Ipfs;
+using OwlCore.Diagnostics;
 using OwlCore.Extensions;
 using OwlCore.Kubo;
 using OwlCore.Nomad.Kubo;
@@ -227,16 +228,17 @@ public static class KuboBasedNomadStorageExtensions
             // Add new entry cid to event stream content.
             localEventStreamContent.Entries.Add(newEventStreamEntryCid);
             
-            /*
             Logger.LogInformation($"{nameof(localEventStreamContent)} entries for {localEventStreamContent.TargetId}:");
             foreach(var entry in localEventStreamContent.Entries)
-            Logger.LogInformation($"{nameof(localEventStreamContent)} {localEventStreamContent.TargetId}: {entry}");
-            */
+                Logger.LogInformation($"{nameof(localEventStreamContent)} {localEventStreamContent.TargetId}: {entry}");
+            
 
             // Get new cid for full local event stream.
             var localEventStreamCid = await client.Dag.PutAsync(localEventStreamContent, pin: handler.KuboOptions.ShouldPin, cancel: cancellationToken);
 
             // Update the local event stream in ipns.
+            Guard.IsNotEqualTo(handler.LocalEventStreamKeyName, handler.RoamingKeyName);
+            Guard.IsNotNullOrWhiteSpace(handler.LocalEventStreamKeyName);
             await client.Name.PublishAsync(localEventStreamCid, handler.LocalEventStreamKeyName, cancel: cancellationToken);
 
             return newEventStreamEntry;

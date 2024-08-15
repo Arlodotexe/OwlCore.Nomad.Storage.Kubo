@@ -233,7 +233,10 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
 
         // Add local event stream source, if exists and needed
         Logger.LogInformation($"Loading local event stream");
-        var localKey = await client.GetOrCreateKeyAsync(localEventStreamKeyName, _ => new EventStream<Cid> { TargetId = roamingIpnsKey, Label = string.Empty, Entries = [] }, kuboOptions.IpnsLifetime, 4096, cancellationToken);
+        var localKey = enumerable.FirstOrDefault(x => x.Id == roamingIpnsKey);
+        if (localKey is null)
+            throw new ArgumentException($"Tried to create modifiable folder, but roaming key {roamingIpnsKey} hasn't been imported and can't be written to.");
+        
         var (localEventStream, _) = await client.ResolveDagCidAsync<EventStream<Cid>>(localKey.Id, nocache: !kuboOptions.UseCache, cancellationToken);
         Guard.IsNotNull(localEventStream);
 
