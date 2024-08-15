@@ -145,7 +145,6 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
 		<PackageReference Include="OwlCore.Kubo" Version="0.17.1" />
 		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.7.0" />
-		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.8.0" />
 		<PackageReference Include="PolySharp" Version="1.14.1">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -158,5 +157,9 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 	    <Pack>True</Pack>
 	    <PackagePath>\</PackagePath>
 	  </None>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\ocnomadkubo\src\OwlCore.Nomad.Kubo.csproj" />
 	</ItemGroup>
 </Project>
