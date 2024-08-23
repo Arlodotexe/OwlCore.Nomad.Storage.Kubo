@@ -24,6 +24,8 @@
 --- 0.8.0 ---
 [Breaking]
 Inherited and implemented breaking changes from OwlCore.Nomad 0.8.0.
+Inherited and implemented breaking changes from OwlCore.Nomad.Storage 0.8.0.
+Inherited and implemented breaking changes from OwlCore.Nomad.Kubo 0.9.0.
 KuboBasedNomadStorageExtensions.TryAdvanceEventStream now takes IModifiableKuboNomadFile or IModifiableKuboNomadFolder as the 'this' param.
 KuboNomadFolder still uses the event stream handler from OwlCore.Noamd.Storage.NomadFolder, but ReadOnlyKuboNomadFolder uses roaming data directly and does not use an event stream handler. 
 KuboBasedNomadStorageExtensions.ApplyFolderUpdateAsync and KuboBasedNomadStorageExtensions.ApplyFileUpdateAsync were removed as they are now handled by the underlying NomadFolder implementation.
@@ -159,7 +161,7 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
 		<PackageReference Include="OwlCore.Kubo" Version="0.17.2" />
 		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.8.0" />
-		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.8.0" />
+		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.9.0" />
 		<PackageReference Include="PolySharp" Version="1.14.1">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
