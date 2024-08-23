@@ -14,13 +14,29 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 		<Author>Arlo Godfrey</Author>
-		<Version>0.7.0</Version>
+		<Version>0.8.0</Version>
 		<Product>OwlCore</Product>
 		<Description>A storage implementation powered by shared event sourcing on IPFS.</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
 		<PackageReleaseNotes>
+--- 0.8.0 ---
+[Breaking]
+Inherited and implemented breaking changes from OwlCore.Nomad 0.8.0.
+Inherited and implemented breaking changes from OwlCore.Nomad.Storage 0.8.0.
+Inherited and implemented breaking changes from OwlCore.Nomad.Kubo 0.9.0.
+KuboBasedNomadStorageExtensions.TryAdvanceEventStream now takes IModifiableKuboNomadFile or IModifiableKuboNomadFolder as the 'this' param.
+KuboNomadFolder still uses the event stream handler from OwlCore.Noamd.Storage.NomadFolder, but ReadOnlyKuboNomadFolder uses roaming data directly and does not use an event stream handler. 
+KuboBasedNomadStorageExtensions.ApplyFolderUpdateAsync and KuboBasedNomadStorageExtensions.ApplyFileUpdateAsync were removed as they are now handled by the underlying NomadFolder implementation.
+
+[Fixes]
+Fixed an issue with WritableNomadFileStream where a race condition + bad stream seeking would cause empty content to be flushed to Kubo.
+
+[Improvements]
+Ported and refined prototype CLI code to build out a test suite for this implementation, which helped clear up most of the remaining inconsistencies around Nomad as a whole.
+Generally, the library no longer auto-publishes to Kubo for you, instead holding the data in memory and sharing across instances. The constructor caller is expected to know when and why to flush roaming or local data to Kubo. 
+
 --- 0.7.0 ---
 [Fixes]
 Fixed an issue where calling AppendAndPublishNewEntryToEventStreamAsync with concurrency could have caused data to be lost.
@@ -143,9 +159,9 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
-		<PackageReference Include="OwlCore.Kubo" Version="0.17.1" />
-		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.7.0" />
-		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.8.0" />
+		<PackageReference Include="OwlCore.Kubo" Version="0.17.2" />
+		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.8.0" />
+		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.9.0" />
 		<PackageReference Include="PolySharp" Version="1.14.1">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

@@ -14,9 +14,9 @@ using OwlCore.Nomad.Storage.Kubo.Models;
 namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
-/// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
+/// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
 /// </summary>
-public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableKuboBasedNomadFile
+public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableKuboNomadFile
 {
     /// <summary>
     /// Creates a new instance of <see cref="KuboNomadFile"/>.
@@ -33,18 +33,11 @@ public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     /// <inheritdoc/>
     public required ICoreApi Client { get; set; }
 
-    /// <summary>
-    /// The name of the local ipns key to publish event stream changes to.
-    /// </summary>
-    public required string LocalEventStreamKeyName { get; init; }
+    /// <inheritdoc/>
+    public required IKey LocalEventStreamKey { get; init; }
 
     /// <inheritdoc/>
-    public required string RoamingKeyName { get; init; }
-
-    /// <summary>
-    /// The resolved event stream entries to use when constructing child files and folders.
-    /// </summary>
-    public required ICollection<EventStreamEntry<Cid>> EventStreamEntries { get; init; }
+    public required IKey RoamingKey { get; init; }
 
     /// <inheritdoc />
     public override async Task<Stream> OpenStreamAsync(FileAccess accessMode = FileAccess.Read, CancellationToken cancellationToken = default)
@@ -76,8 +69,7 @@ public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
         // Use extension method for code deduplication (can't use inheritance).
         var localUpdateEventCid = await Client.Dag.PutAsync(updateEvent, pin: KuboOptions.ShouldPin, cancel: cancellationToken);
 
-        var newEntry = await this.AppendAndPublishNewEntryToEventStreamAsync(localUpdateEventCid, updateEvent.EventId, targetId: Id, cancellationToken);
-        EventStreamEntries.Add(newEntry);
+        var newEntry = await this.AppendEventStreamEntryAsync(localUpdateEventCid, updateEvent.EventId, targetId: Id, cancellationToken);
         return newEntry;
     }
 

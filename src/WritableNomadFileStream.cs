@@ -45,12 +45,19 @@ public class WritableNomadFileStream : WritableLazySeekStream
         if (Position != Length)
             Seek(0, SeekOrigin.End);
 
+        if (DestinationStream.Position != 0)
+            DestinationStream.Position = 0;
+
+        if (MemoryStream.Position != 0)
+            MemoryStream.Position = 0;
+        
+        Guard.IsGreaterThan(MemoryStream.Length, 0);
+
         // Copy memory stream to destination.
         // Will include any writes done below.
         await MemoryStream.CopyToAsync(DestinationStream);
-
-        if (DestinationStream.Position != 0)
-            DestinationStream.Position = 0;
+        
+        Guard.IsGreaterThan(DestinationStream.Length, 0);
 
         // Calculate hash first
         var addFileOptions = new AddFileOptions { Pin = false, OnlyHash = true };

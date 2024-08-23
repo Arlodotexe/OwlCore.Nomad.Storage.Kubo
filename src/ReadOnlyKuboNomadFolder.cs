@@ -1,136 +1,90 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using CommunityToolkit.Diagnostics;
 using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
-using OwlCore.Diagnostics;
-using OwlCore.Kubo;
-using OwlCore.Nomad.Kubo;
-using OwlCore.Nomad.Storage.Kubo.Extensions;
 using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage;
 
 namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
-/// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
+/// A virtual folder constructed by reading the roaming <see cref="NomadFolderData{TContentPointer}"/> published by another node.
 /// </summary>
-public class ReadOnlyKuboNomadFolder : ReadOnlyNomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IReadOnlyKuboBasedNomadFolder
+public class ReadOnlyKuboNomadFolder : IChildFolder, IDelegable<NomadFolderData<Cid>>, IGetRoot
 {
     /// <summary>
-    /// Creates a new instance of <see cref="ReadOnlyKuboNomadFolder"/>.
+    /// The client to use for communicating with ipfs/kubo.
     /// </summary>
-    /// <param name="listeningEventStreamHandlers">The shared collection of known nomad event streams participating in event seeking.</param>
-    public ReadOnlyKuboNomadFolder(ICollection<ISharedEventStreamHandler<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> listeningEventStreamHandlers)
-        : base(listeningEventStreamHandlers)
-    {
-    }
-
-    /// <inheritdoc/>
-    public required IKuboOptions KuboOptions { get; set; }
-
-    /// <inheritdoc/>
     public required ICoreApi Client { get; set; }
 
-    /// <summary>
-    /// The interval that IPNS should be checked for updates.
-    /// </summary>
-    public TimeSpan UpdateCheckInterval { get; } = TimeSpan.FromMinutes(1);
+    /// <inheritdoc />
+    public string Id => Inner.StorableItemId;
 
     /// <inheritdoc />
-    public override Task AdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
-    {
-        // Use extension method for code deduplication (can't use inheritance).
-        return this.TryAdvanceEventStreamAsync(streamEntry, cancellationToken);
-    }
+    public string Name => Inner.StorableItemName;
+
+    /// <inheritdoc />
+    public required NomadFolderData<Cid> Inner { get; init; }
 
     /// <summary>
-    /// Applies the provided storage update event without external side effects.
+    /// The parent for this folder, if any.
     /// </summary>
-    /// <param name="updateEventContent">The event to apply.</param>
-    /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
-    public Task ApplyEntryUpdateAsync(FolderUpdateEvent updateEventContent, CancellationToken cancellationToken)
-    {
-        // Use extension method for code deduplication (can't use inheritance).
-        return updateEventContent switch
-        {
-            CreateFileInFolderEvent createFileInFolderEvent => this.ApplyFolderUpdateAsync(createFileInFolderEvent, cancellationToken),
-            CreateFolderInFolderEvent createFolderInFolderEvent => this.ApplyFolderUpdateAsync(createFolderInFolderEvent, cancellationToken),
-            DeleteFromFolderEvent deleteFromFolderEvent => this.ApplyFolderUpdateAsync(deleteFromFolderEvent, cancellationToken),
-            _ => throw new ArgumentOutOfRangeException($"Unhandled {nameof(FolderUpdateEvent)} type {updateEventContent.GetType()}."),
-        };
-    }
-
-    /// <inheritdoc />
-    public override Task<IFolderWatcher> GetFolderWatcherAsync(CancellationToken cancellationToken = default) => Task.FromResult<IFolderWatcher>(new TimerBasedNomadFolderWatcher(this, UpdateCheckInterval));
-
-    /// <inheritdoc />
-    protected override Task<ReadOnlyNomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> FileDataToInstanceAsync(NomadFileData<Cid> fileData, CancellationToken cancellationToken)
-    {
-        var file = new ReadOnlyKuboNomadFile(ListeningEventStreamHandlers)
-        {
-            Parent = this,
-            Inner = fileData,
-            Sources = Sources,
-            Client = Client,
-            KuboOptions = KuboOptions,
-            EventStreamId = EventStreamId,
-        };
-        
-        // Event stream doesn't need to be advanced for read only data. The Inner fileData should have the current state.
-        return Task.FromResult<ReadOnlyNomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>>(file);
-    }
-
-    /// <inheritdoc />
-    protected override Task<ReadOnlyNomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> FolderDataToInstanceAsync(NomadFolderData<Cid> folderData, CancellationToken cancellationToken)
-    {
-        var folder = new ReadOnlyKuboNomadFolder(ListeningEventStreamHandlers)
-        {
-            Parent = this,
-            Inner = folderData,
-            Sources = Sources,
-            Client = Client,
-            KuboOptions = KuboOptions,
-            EventStreamId = EventStreamId,
-        };
-
-        // Event stream doesn't need to be advanced for read only data. The Inner folderData should have the current state.
-        return Task.FromResult<ReadOnlyNomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>>(folder);
-    }
+    public required ReadOnlyKuboNomadFolder? Parent { get; init; }
     
-    /// <summary>
-    /// Creates a new instance of <see cref="KuboNomadFolder"/> using the given parameters.
-    /// </summary>
-    /// <param name="roamingIpnsKey">The roaming ipns key to publish the final state to.</param>
-    /// <param name="client">The client to use for communicating with ipfs.</param>
-    /// <param name="kuboOptions">The options to use when interacting with to Kubo.</param>
-    /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
-    /// <returns>A task with the requested folder as the result.</returns>
-    /// <exception cref="ArgumentException">The provided <paramref name="roamingIpnsKey"/> isn't imported on the local machine, so the folder can't be modified.</exception>
-    public static async Task<ReadOnlyKuboNomadFolder> CreateAsync(Cid roamingIpnsKey, ICoreApi client, IKuboOptions kuboOptions, CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async IAsyncEnumerable<IStorableChild> GetItemsAsync(StorableType type = StorableType.All, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var sharedEventStreamHandlers = new List<ISharedEventStreamHandler<Cid, EventStream<Cid>, EventStreamEntry<Cid>>>();
+        cancellationToken.ThrowIfCancellationRequested();
+        await Task.Yield();
 
-        // Add published event stream sources, if any
-        Logger.LogInformation($"Loading sources from roaming key {roamingIpnsKey}");
-        var (publishedData, _) = await roamingIpnsKey.ResolveDagCidAsync<NomadFolderData<Cid>>(client, nocache: !kuboOptions.UseCache, cancellationToken);
-        Guard.IsNotNull(publishedData);
-
-        var folder = new ReadOnlyKuboNomadFolder(sharedEventStreamHandlers)
+        if (type.HasFlag(StorableType.File))
         {
-            EventStreamId = roamingIpnsKey,
-            Sources = publishedData.Sources,
-            Parent = null,
-            Inner = publishedData,
-            Client = client,
-            KuboOptions = kuboOptions,
-        };
+            foreach (var file in Inner.Files)
+            {
+                yield return new ReadOnlyKuboNomadFile
+                {
+                    Client = Client,
+                    Inner = file,
+                    Parent = this,
+                };
+            }
+        }
 
-        // Event stream doesn't need to be advanced for read only data. The Inner folderData should have the current state.
-        Logger.LogInformation($"Folder {folder.Id} loaded");
-        return folder;
+        if (type.HasFlag(StorableType.Folder))
+        {
+            foreach (var folder in Inner.Folders)
+            {
+                yield return new ReadOnlyKuboNomadFolder
+                {
+                    Client = Client,
+                    Inner = folder,
+                    Parent = this,
+                };
+            } 
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<IFolder?> GetParentAsync(CancellationToken cancellationToken = default) => Task.FromResult<IFolder?>(Parent);
+
+    /// <inheritdoc />
+    public Task<IFolder?> GetRootAsync(CancellationToken cancellationToken = default)
+    {
+        // No parent = no root
+        if (Parent is null)
+            return Task.FromResult<IFolder?>(null);
+        
+        // At least one parent is required for a root to exist
+        // Crawl up and return where parent is null
+        var current = this;
+        while (current.Parent is { } parent)
+        {
+            current = parent;
+        }
+
+        return Task.FromResult<IFolder?>(current);
     }
 }
