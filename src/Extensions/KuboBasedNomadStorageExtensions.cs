@@ -4,10 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Diagnostics;
 using Ipfs;
-using OwlCore.Diagnostics;
-using OwlCore.Extensions;
 using OwlCore.Kubo;
-using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Kubo.Models;
 using OwlCore.Nomad.Storage.Models;
 
@@ -112,49 +109,5 @@ public static class KuboBasedNomadStorageExtensions
             nomadFolder.Inner.Files.Remove(targetFile);
 
         return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// A lock for <see cref="AppendEventStreamEntryAsync{T}"/>.
-    /// </summary>
-    private static SemaphoreSlim AppendLock { get; } = new(1, 1);
-
-    /// <summary>
-    /// Appends a new event to the event stream and publishes it to ipns.
-    /// </summary>
-    /// <param name="handler">The storage interface to operate on.</param>
-    /// <param name="updateEventContentCid">The CID to use for the content of this update event.</param>
-    /// <param name="eventId">A unique identifier for this event type.</param>
-    /// <param name="targetId">A unique identifier for the provided <paramref name="handler"/> that can be used to reapply the event later.</param>
-    /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
-    /// <returns>A task containing the new event stream entry.</returns>
-    public static async Task<EventStreamEntry<Cid>> AppendEventStreamEntryAsync<T>(this INomadKuboEventStreamHandler<T> handler, Cid updateEventContentCid, string eventId, string targetId, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var client = handler.Client;
-
-        using (await AppendLock.DisposableWaitAsync(cancellationToken: cancellationToken))
-        {
-            // Get local event stream.
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // Append the event to the local event stream.
-            var newEventStreamEntry = new EventStreamEntry<Cid>
-            {
-                TargetId = targetId,
-                EventId = eventId,
-                TimestampUtc = DateTime.UtcNow,
-                Content = updateEventContentCid,
-            };
-
-            // Get new cid for new local event stream entry.
-            var newEventStreamEntryCid = await client.Dag.PutAsync(newEventStreamEntry, pin: handler.KuboOptions.ShouldPin, cancel: cancellationToken);
-
-            // Add new entry cid to event stream content.
-            handler.LocalEventStream.Entries.Add(newEventStreamEntryCid);
-            handler.AllEventStreamEntries.Add(newEventStreamEntry);
-            
-            return newEventStreamEntry;
-        }
     }
 }

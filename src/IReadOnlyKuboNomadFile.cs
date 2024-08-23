@@ -1,7 +1,5 @@
 ﻿using Ipfs;
 using OwlCore.ComponentModel;
-using OwlCore.Nomad.Kubo;
-using OwlCore.Nomad.Storage.Kubo.Models;
 using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage;
 
