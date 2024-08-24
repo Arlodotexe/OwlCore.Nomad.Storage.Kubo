@@ -52,7 +52,7 @@ public partial class KuboNomadFolderTests
             
             // Create local AND roaming keys for nodeA.
             // During pairing, roamingA will be exported to nodeB, and localB will be added to the event stream for localA.
-            var (localA, roamingA) = await CreateStorageKeysAsync(localKeyName, roamingKeyName, folderId, folderId, clientA, cancellationToken);
+            var (localA, roamingA) = await NomadStorageKeys.CreateStorageKeysAsync(localKeyName, roamingKeyName, folderId, folderId, clientA, cancellationToken);
             {
                 // Default value validation.
                 // roaming should be the TargetId on local,
@@ -70,7 +70,7 @@ public partial class KuboNomadFolderTests
             }
             
             // Only create local key for nodeB, roaming key will be imported from nodeA.
-            var localB = await GetOrCreateLocalStorageKeyAsyc(localKeyName, folderId, roamingKey: roamingA.Key, kuboOptions, clientB, cancellationToken);
+            var localB = await NomadStorageKeys.GetOrCreateLocalStorageKeyAsyc(localKeyName, folderId, roamingKey: roamingA.Key, kuboOptions, clientB, cancellationToken);
             {
                 // Default value validation
                 Guard.IsEqualTo(localB.Value.TargetId, $"{roamingA.Key.Id}");
@@ -87,8 +87,8 @@ public partial class KuboNomadFolderTests
                 var password = string.Join(null, pairingCode.Skip(4));
                 
                 // Initiate pairing from node a and follow up on nodeB
-                var nodeAPairingTask = EncryptedPubSubNomadPairAsync(kuboA, kuboOptions, clientA, kuboA.Client, localA.Key, isRoamingReceiver: false, roamingKeyName, roomName, password, cancellationToken); 
-                var nodeBPairingTask = EncryptedPubSubNomadPairAsync(kuboB, kuboOptions, clientB, kuboB.Client, localB.Key, isRoamingReceiver: true, roamingKeyName, roomName, password, cancellationToken);
+                var nodeAPairingTask = KeyExchange.PairWithEncryptedPubSubAsync(kuboA, kuboOptions, clientA, kuboA.Client, localA.Key, isRoamingReceiver: false, roamingKeyName, roomName, password, cancellationToken); 
+                var nodeBPairingTask = KeyExchange.PairWithEncryptedPubSubAsync(kuboB, kuboOptions, clientB, kuboB.Client, localB.Key, isRoamingReceiver: true, roamingKeyName, roomName, password, cancellationToken);
             
                 await Task.WhenAll(nodeAPairingTask, nodeBPairingTask);
             }

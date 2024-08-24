@@ -41,7 +41,7 @@ public partial class KuboNomadFolderTests
             var folderId = nameof(PushTestAsync);
 
             var client = kubo.Client;
-            var (local, roaming) = await CreateStorageKeysAsync($"Nomad.Storage.Local.{folderId}", $"Nomad.Storage.Roaming.{folderId}", folderId, folderId, client, cancellationToken);
+            var (local, roaming) = await NomadStorageKeys.CreateStorageKeysAsync($"Nomad.Storage.Local.{folderId}", $"Nomad.Storage.Roaming.{folderId}", folderId, folderId, client, cancellationToken);
             {
                 // Default value validation.
                 // roaming should be the TargetId on local,

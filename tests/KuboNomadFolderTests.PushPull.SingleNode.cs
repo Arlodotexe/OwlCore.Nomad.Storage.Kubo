@@ -45,7 +45,7 @@ public partial class KuboNomadFolderTests
             var roamingKeyName = $"Nomad.Storage.Roaming.{folderId}";
 
             var client = kubo.Client;
-            var (local, roaming) = await CreateStorageKeysAsync(localKeyName, roamingKeyName, folderId, folderId, client, cancellationToken);
+            var (local, roaming) = await NomadStorageKeys.CreateStorageKeysAsync(localKeyName, roamingKeyName, folderId, folderId, client, cancellationToken);
             {
                 // Default value validation.
                 // roaming should be the TargetId on local,

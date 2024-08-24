@@ -8,9 +8,6 @@ using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage.System.IO;
 using OwlCore.Diagnostics;
-using OwlCore.Extensions;
-using OwlCore.Nomad.Kubo.Events;
-using OwlCore.Nomad.Storage.Kubo.Tests.Extensions;
 using OwlCore.Storage;
 
 namespace OwlCore.Nomad.Storage.Kubo.Tests;
@@ -18,10 +15,7 @@ namespace OwlCore.Nomad.Storage.Kubo.Tests;
 [TestClass]
 public partial class KuboNomadFolderTests
 {
-    private void LoggerOnMessageReceived(object? sender, LoggerMessageEventArgs args)
-    {
-        Debug.WriteLine(args.Message);
-    }
+    private void LoggerOnMessageReceived(object? sender, LoggerMessageEventArgs args) => Debug.WriteLine(args.Message);
 
     private async Task VerifyFolderContents(SystemFolder sourceFolder, SystemFolder destinationFolder, CancellationToken cancellationToken)
     {
@@ -70,26 +64,6 @@ public partial class KuboNomadFolderTests
             Guard.IsEmpty(publishedRoaming.Folders);
         }
         return publishedRoaming;
-    }
-
-    public async Task EncryptedPubSubNomadPairAsync(KuboBootstrapper kubo, IKuboOptions kuboOptions, ICoreApi client, IGenericApi genericApi, IKey localKey, bool isRoamingReceiver, string roamingKeyName, string roomName, string password, CancellationToken cancellationToken = default)
-    {
-        // Setup encrypted pubsub
-        var thisPeer = await genericApi.IdAsync(cancel: cancellationToken);
-        var encryptedPubSub = new AesPasswordEncryptedPubSub(client.PubSub, password, salt: roomName);
-        using var peerRoom = new PeerRoom(thisPeer, encryptedPubSub, $"{roomName}")
-        {
-            HeartbeatEnabled = false,
-        };
-        
-        // Local key must be initialized prior to pairing
-        // Roaming key must exist on the 'roaming sender' node, must not exist on 'roaming receiver' node.
-        // The node that receives a roaming key should be a sender for local key, and vice versa.
-        await KeyExchange.ExchangeRoamingKeyAsync(peerRoom, roamingKeyName, isReceiver: isRoamingReceiver, kubo, kuboOptions, client, cancellationToken);
-
-        // The node that sends a roaming key should be receiver for local key, and vice versa.
-        var isLocalReceiver = !isRoamingReceiver;
-        await KeyExchange.ExchangeLocalSourceAsync(peerRoom, localKey, roamingKeyName, isReceiver: isLocalReceiver, kuboOptions, client, cancellationToken);
     }
 
     public static DateTime GetLastWriteTimeFor(IStorable storable, IEnumerable<EventStreamEntry<Cid>> eventStreamEntries)
@@ -158,73 +132,12 @@ public partial class KuboNomadFolderTests
         return kubo;
     }
     
-    private async Task<CachedCoreApi> CreateCachedClientAsync(KuboBootstrapper kubo, CancellationToken cancellationToken)
+    private static async Task<CachedCoreApi> CreateCachedClientAsync(KuboBootstrapper kubo, CancellationToken cancellationToken)
     {
         var cacheFolder = (SystemFolder)await kubo.RepoFolder.CreateFolderAsync(".cache", overwrite: false, cancellationToken: cancellationToken);
         var cacheLayer = new CachedCoreApi(cacheFolder, kubo.Client);
 
         await cacheLayer.InitAsync(cancellationToken);
         return cacheLayer;
-    }
-
-    /// <summary>
-    /// Creates roaming and local storage keys and yields a default recommended value, but does not publish the value to the newly created keys.
-    /// </summary>
-    /// <param name="localKeyName">The name of the local key to create.</param>
-    /// <param name="roamingKeyName">The name of the roaming key to create.</param>
-    /// <param name="nomadFolderName">The root folder name to use in the roaming data.</param>
-    /// <param name="eventStreamLabel">The label to use for the created local event stream.</param>
-    /// <param name="client">A client to use for communicating with ipfs.</param>
-    /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
-    private async Task<((IKey Key, EventStream<Cid> Value) LocalKey, (IKey Key, NomadFolderData<Cid> Value) RoamingKey)> CreateStorageKeysAsync(string localKeyName, string roamingKeyName, string nomadFolderName, string eventStreamLabel, ICoreApi client, CancellationToken cancellationToken)
-    {
-        // Get or create ipns key
-        var enumerableKeys = await client.Key.ListAsync(cancellationToken);
-        var keys = enumerableKeys as IKey[] ?? enumerableKeys.ToArray();
-
-        var localKey = keys.FirstOrDefault(x => x.Name == localKeyName);
-        var roamingKey = keys.FirstOrDefault(x => x.Name == roamingKeyName);
-        
-        // Key should not be created yet
-        Guard.IsNull(localKey);
-        Guard.IsNull(roamingKey);
-        
-        localKey = await client.Key.CreateAsync(localKeyName, "ed25519", size: 4096, cancellationToken);
-        roamingKey = await client.Key.CreateAsync(roamingKeyName, "ed25519", size: 4096, cancellationToken);
-
-        // Get default value and cid
-        // ---
-        // Roaming should not be exported/imported without including at least one local source,
-        // otherwise we'd have an extra step exporting local separately from roaming from A to B.
-        // ---
-        // This is also retroactively handled when publishing an event stream to roaming, but we're only defining the seed values here.
-        var defaultLocalValue = new EventStream<Cid>
-        {
-            Label = eventStreamLabel,
-            TargetId = roamingKey.Id,
-            Entries = [],
-        };
-
-        var defaultRoamingValue = new NomadFolderData<Cid>
-        {
-            StorableItemId = roamingKey.Id,
-            StorableItemName = nomadFolderName,
-            Files = [],
-            Folders = [],
-            Sources = [localKey.Id],
-        };
-
-        return ((localKey, defaultLocalValue), (roamingKey, defaultRoamingValue));
-    }
-
-    private static Task<(IKey Key, EventStream<Cid> Value)> GetOrCreateLocalStorageKeyAsyc(string localKeyName, string eventStreamLabel, IKey roamingKey, KuboOptions kuboOptions, ICoreApi client, CancellationToken cancellationToken)
-    {
-        // Local key should contain an empty event stream with the roaming key as the targetid
-        return client.GetOrCreateKeyAsync(localKeyName, _ => new EventStream<Cid>
-        {
-            Label = eventStreamLabel,
-            TargetId = roamingKey.Id, 
-            Entries = [],
-        }, kuboOptions.IpnsLifetime, nocache: !kuboOptions.UseCache, size: 4096, cancellationToken);
     }
 }

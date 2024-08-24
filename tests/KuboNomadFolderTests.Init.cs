@@ -26,19 +26,13 @@ public partial class KuboNomadFolderTests
         var temp = new SystemFolder(Path.GetTempPath());
         var testTempFolder = await SafeCreateFolderAsync(temp, $"{nameof(KuboNomadFolderTests)}.{nameof(InitTestAsync)}", cancellationToken);
         var kubo = await BootstrapKuboAsync(testTempFolder, 5011, 8011, cancellationToken);
-        var kuboOptions = new KuboOptions
-        {
-            IpnsLifetime = TimeSpan.FromDays(1),
-            ShouldPin = false,
-            UseCache = true,
-        };
         
         var folderId = nameof(InitTestAsync);
         var localKeyName = $"Nomad.Storage.Local.{folderId}";
         var roamingKeyName = $"Nomad.Storage.Roaming.{folderId}";
 
         var client = await CreateCachedClientAsync(kubo, cancellationToken);
-        var (local, roaming) = await CreateStorageKeysAsync(localKeyName, roamingKeyName, folderId, folderId, client, cancellationToken);
+        var (local, roaming) = await NomadStorageKeys.CreateStorageKeysAsync(localKeyName, roamingKeyName, folderId, folderId, client, cancellationToken);
         
         // Roaming key should contain an empty list of files and folders, as well as the sources used to construct the object. 
         Guard.IsNotNull(roaming.Key);
