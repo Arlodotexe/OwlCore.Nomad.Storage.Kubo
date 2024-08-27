@@ -87,8 +87,8 @@ public partial class KuboNomadFolderTests
                 var password = string.Join(null, pairingCode.Skip(4));
 
                 // Initiate pairing from node a and follow up on nodeB
-                var nodeAPairingTask = KeyExchange.PairWithEncryptedPubSubAsync(kuboA, kuboOptions, clientA, kuboA.Client, localA.Key, isRoamingReceiver: false, roamingKeyName, roomName, password, cancellationToken);
-                var nodeBPairingTask = KeyExchange.PairWithEncryptedPubSubAsync(kuboB, kuboOptions, clientB, kuboB.Client, localB.Key, isRoamingReceiver: true, roamingKeyName, roomName, password, cancellationToken);
+                var nodeAPairingTask = KeyExchange.PairWithEncryptedPubSubAsync(kuboA, kuboOptions, clientA, kuboA.Client, (_, _) => Task.FromResult(localA.Key), isRoamingReceiver: false, roamingKeyName, roomName, password, cancellationToken);
+                var nodeBPairingTask = KeyExchange.PairWithEncryptedPubSubAsync(kuboB, kuboOptions, clientB, kuboB.Client, (_, _) => Task.FromResult(localB.Key), isRoamingReceiver: true, roamingKeyName, roomName, password, cancellationToken);
 
                 await Task.WhenAll(nodeAPairingTask, nodeBPairingTask);
             
