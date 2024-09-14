@@ -5,19 +5,28 @@ using OwlCore.Nomad.Kubo;
 using OwlCore.Storage.System.IO;
 using OwlCore.Diagnostics;
 using OwlCore.Nomad.Storage.Kubo.Tests.Extensions;
+using OwlCore.Storage;
 
 namespace OwlCore.Nomad.Storage.Kubo.Tests;
 
 public partial class KuboNomadFolderTests
 {
+    [DataRow(1000, 3)]
+    [DataRow(10000, 3)]
+    [DataRow(1000000, 2)]
+    [DataRow(10000000, 1)]
+    [DataRow(int.MaxValue - 1000L, 1)]
+    [DataRow((long)int.MaxValue, 1)]
+    [DataRow(int.MaxValue + 1000L, 1)]
     [TestMethod]
-    public async Task PushPullPairedTwoNodeTestAsync()
+    public async Task PushPullPairedTwoNodeTestAsync(long numberOfBytes, int fileCount)
     {
         Logger.MessageReceived += LoggerOnMessageReceived;
         var cancellationToken = CancellationToken.None;
 
         var temp = new SystemFolder(Path.GetTempPath());
-        var testTempFolder = await SafeCreateFolderAsync(temp, $"{nameof(KuboNomadFolderTests)}.{nameof(PushPullPairedTwoNodeTestAsync)}", cancellationToken);
+        var folderId = $"{nameof(KuboNomadFolderTests)}.{nameof(PushPullPairedTwoNodeTestAsync)}.{fileCount}.{numberOfBytes}";
+        var testTempFolder = await SafeCreateFolderAsync(temp, folderId, cancellationToken);
         var kuboOptions = new KuboOptions
         {
             IpnsLifetime = TimeSpan.FromDays(1),
@@ -43,10 +52,9 @@ public partial class KuboNomadFolderTests
             var destinationFolder = (SystemFolder)await testTempFolder.CreateFolderAsync("out", cancellationToken: cancellationToken);
             
             // Add new content to source, to be pushed via A and pulled via B 
-            await foreach (var file in sourceFolder.CreateFilesAsync(5, i => $"pushedFromA.{i}", cancellationToken))
-                await file.WriteRandomBytes(numberOfBytes: 4096, cancellationToken);
+            await foreach (var file in sourceFolder.CreateFilesAsync(fileCount, i => $"pushedFromA.{i}", cancellationToken))
+                await file.WriteRandomBytes(numberOfBytes, 4096, cancellationToken);
             
-            var folderId = nameof(PairingTestAsync);
             var roamingKeyName = $"Nomad.Storage.Roaming.{folderId}";
             var localKeyName = $"Nomad.Storage.Local.{folderId}";
 
@@ -106,7 +114,13 @@ public partial class KuboNomadFolderTests
                 var roamingBKey = keysB.FirstOrDefault(x => x.Id == roamingA.Key.Id);
                 Guard.IsNotNull(roamingBKey);
                 var publishedRoamingBOnB = await ResolveAndValidatePublishedRoamingSeedAsync(clientB, roamingBKey, kuboOptions, cancellationToken);
-
+                
+                var mfsRootA = new MfsFolder("/", clientA);
+                var cacheFolderA = (IModifiableFolder)await mfsRootA.CreateFolderAsync(".cache", cancellationToken: cancellationToken);
+                cacheFolderA = (IModifiableFolder)await cacheFolderA.CreateFolderAsync("nomad", cancellationToken: cancellationToken);
+                cacheFolderA = (IModifiableFolder)await cacheFolderA.CreateFolderAsync(folderId, cancellationToken: cancellationToken);
+                await clientA.Mfs.FlushAsync(mfsRootA.Path, cancellationToken);
+                
                 var sharedEventStreamHandlersA = new List<ISharedEventStreamHandler<Cid, EventStream<Cid>, EventStreamEntry<Cid>>>();
                 var nomadFolderA = new KuboNomadFolder(sharedEventStreamHandlersA)
                 {
@@ -120,7 +134,15 @@ public partial class KuboNomadFolderTests
                     Client = clientA,
                     KuboOptions = kuboOptions,
                     Parent = null,
+                    TempCacheFolder = cacheFolderA,
                 };
+                
+                
+                var mfsRootB = new MfsFolder("/", clientB);
+                var cacheFolderB = (IModifiableFolder)await mfsRootB.CreateFolderAsync(".cache", cancellationToken: cancellationToken);
+                cacheFolderB = (IModifiableFolder)await cacheFolderB.CreateFolderAsync("nomad", cancellationToken: cancellationToken);
+                cacheFolderB = (IModifiableFolder)await cacheFolderB.CreateFolderAsync(folderId, cancellationToken: cancellationToken);
+                await clientB.Mfs.FlushAsync(mfsRootA.Path, cancellationToken);
                 
                 var sharedEventStreamHandlersB = new List<ISharedEventStreamHandler<Cid, EventStream<Cid>, EventStreamEntry<Cid>>>();
                 var nomadFolderB = new KuboNomadFolder(sharedEventStreamHandlersB)
@@ -135,6 +157,7 @@ public partial class KuboNomadFolderTests
                     Client = clientB,
                     KuboOptions = kuboOptions,
                     Parent = null,
+                    TempCacheFolder = cacheFolderB,
                 };
                 
                 // Push via A
@@ -169,8 +192,8 @@ public partial class KuboNomadFolderTests
                 // Push via B
                 {
                     // Add new content to dest, to be pushed via B and pulled via A
-                    await foreach (var file in destinationFolder.CreateFilesAsync(5, i => $"pushedFromB.{i}", cancellationToken))
-                        await file.WriteRandomBytes(numberOfBytes: 4096, cancellationToken);
+                    await foreach (var file in destinationFolder.CreateFilesAsync(fileCount, i => $"pushedFromB.{i}", cancellationToken))
+                        await file.WriteRandomBytes(numberOfBytes: numberOfBytes, bufferSize: 4096, cancellationToken);
                     
                     await destinationFolder.CopyToAsync(nomadFolderB, storable => GetLastWriteTimeFor(storable, nomadFolderB.AllEventStreamEntries), cancellationToken);
                         

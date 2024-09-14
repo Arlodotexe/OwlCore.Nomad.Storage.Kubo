@@ -11,12 +11,30 @@ public static class StorageExtensions
             yield return await folder.CreateFileAsync(getFileName(i), overwrite: true, cancellationToken: cancellationToken);
     }
 
-    public static async Task WriteRandomBytes(this IFile file, int numberOfBytes, CancellationToken cancellationToken)
+    public static async Task WriteRandomBytes(this IFile file, long numberOfBytes, int bufferSize, CancellationToken cancellationToken)
     {
         var rnd = new Random();
-        var bytes = new byte[numberOfBytes];
-        rnd.NextBytes(bytes);
-        
-        await file.WriteBytesAsync(bytes, cancellationToken: cancellationToken);
+
+        await using var fileStream = await file.OpenWriteAsync(cancellationToken);
+
+        var bytes = new byte[bufferSize];
+        var bytesWritten = 0L;
+        while (bytesWritten < numberOfBytes)
+        {
+            var remaining = numberOfBytes - bytesWritten;
+            
+            // Always runs if there are bytes left, even if there's fewer bytes left than the buffer.
+            // Truncate the buffer size to remaining length if smaller than buffer.
+            if (bufferSize > remaining)
+                bufferSize = (int)remaining;
+
+            if (bytes.Length != bufferSize)
+                bytes = new byte[bufferSize];
+            
+            rnd.NextBytes(bytes);
+
+            await fileStream.WriteAsync(bytes, cancellationToken);
+            bytesWritten += bufferSize;
+        }
     }
 }

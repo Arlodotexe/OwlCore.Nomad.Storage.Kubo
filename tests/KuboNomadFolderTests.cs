@@ -30,9 +30,60 @@ public partial class KuboNomadFolderTests
         {
             var pulledFile = pulledFiles.First(x => x.Name == pushedFile.Name);
 
-            var pushedFileBytes = await pushedFile.ReadBytesAsync(cancellationToken);
-            var pulledFileBytes = await pulledFile.ReadBytesAsync(cancellationToken);
-            CollectionAssert.AreEqual(pushedFileBytes, pulledFileBytes);
+            await using var pushedFileStream = await pushedFile.OpenReadAsync(cancellationToken);
+            await using var pulledFileStream = await pulledFile.OpenReadAsync(cancellationToken);
+            
+            Guard.IsEqualTo(pushedFileStream.Position, 0);
+            Guard.IsEqualTo(pulledFileStream.Position, 0);
+            Assert.AreEqual(pushedFileStream.Length, pulledFileStream.Length);
+            
+            await AssertStreamEqualAsync(pushedFileStream, pulledFileStream, 81920, cancellationToken);
+        }
+    }
+
+    private static async Task AssertStreamEqualAsync(Stream srcStream, Stream destStream, int bufferSize, CancellationToken cancellationToken)
+    {
+        Assert.AreEqual(srcStream.Length, destStream.Length);
+
+        var totalBytes = srcStream.Length;
+        var bytesChecked = 0L;
+
+        var srcBuffer = new byte[bufferSize];
+        var destBuffer = new byte[bufferSize];
+
+        // Fill each buffer until bufferSize is reached.
+        // Each stream must fill the buffer until it is full,
+        // except if no bytes are left.
+        while (bytesChecked < totalBytes)
+        {
+            var srcBytesRead = 0;
+            while (srcBytesRead < srcBuffer.Length)
+            {
+                var srcBytesReadInternal = await srcStream.ReadAsync(srcBuffer, offset: srcBytesRead, count: srcBuffer.Length - srcBytesRead, cancellationToken);
+                if (srcBytesReadInternal == 0)
+                    break;
+
+                srcBytesRead += srcBytesReadInternal;
+            }
+
+            var destBytesRead = 0;
+            while (destBytesRead < destBuffer.Length)
+            {
+                var destBytesReadInternal = await destStream.ReadAsync(destBuffer, offset: destBytesRead, count: destBuffer.Length - destBytesRead, cancellationToken);
+                if (destBytesReadInternal == 0)
+                    break;
+
+                destBytesRead += destBytesReadInternal;
+            }
+
+            if (srcBytesRead != destBytesRead)
+            {
+                throw new InvalidOperationException($"Mismatch in bytes read between source and destination streams: {destBytesRead} and {srcBytesRead}.");
+            }
+
+            // When buffers are full, compare and continue.
+            CollectionAssert.AreEqual(destBuffer, srcBuffer);
+            bytesChecked += srcBytesRead;
         }
     }
 

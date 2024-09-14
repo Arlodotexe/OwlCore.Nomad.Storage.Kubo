@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,8 +8,10 @@ using CommunityToolkit.Diagnostics;
 using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
+using OwlCore.Kubo;
 using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Kubo.Extensions;
+using OwlCore.Nomad.Storage.Kubo.Models;
 using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage;
 
@@ -17,7 +20,7 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TContentPointer, TEventStream, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
 /// </summary>
-public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableKuboNomadFolder
+public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableKuboNomadFolder, ICreateCopyOf
 {
     /// <summary>
     /// Creates a new instance of <see cref="KuboNomadFolder"/>.
@@ -39,6 +42,11 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
 
     /// <inheritdoc />
     public required IKey RoamingKey { get; init; }
+    
+    /// <summary>
+    /// A temp folder for caching during read and persisting writes during flush.  
+    /// </summary>
+    public required IModifiableFolder TempCacheFolder { get; init; }
 
     /// <summary>
     /// The interval that IPNS should be checked for updates.
@@ -77,10 +85,51 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     public override Task<IFolderWatcher> GetFolderWatcherAsync(CancellationToken cancellationToken = default) => Task.FromResult<IFolderWatcher>(new TimerBasedNomadFolderWatcher(this, UpdateCheckInterval));
 
     /// <inheritdoc />
+    public async Task<IChildFile> CreateCopyOfAsync(IFile fileToCopy, bool overwrite, CancellationToken cancellationToken, CreateCopyOfDelegate fallback)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // If the destination file exists and overwrite is false, it shouldn't be overwritten or returned as-is. Throw an exception instead.
+        if (!overwrite)
+        {
+            try
+            {
+                var existing = await this.GetFirstByNameAsync(fileToCopy.Name, cancellationToken);
+                if (existing is not null)
+                    throw new FileAlreadyExistsException(fileToCopy.Name);
+            }
+            catch (FileNotFoundException) { }
+        }
+
+        // Create the destination file.
+        var storageUpdateEvent = new CreateFileInFolderEvent(Id, $"{Id}/{fileToCopy.Name}", fileToCopy.Name, overwrite);
+        
+        var createdFileData = await ApplyFolderUpdateAsync(storageUpdateEvent, cancellationToken);
+        EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
+        Guard.IsNotNull(createdFileData);
+        
+        var newFile = (KuboNomadFile)await FileDataToInstanceAsync(createdFileData, cancellationToken);
+        
+        // Populate file cid.
+        var fileToCopyCid = await fileToCopy.GetCidAsync(Client, new AddFileOptions { Pin = KuboOptions.ShouldPin, OnlyHash = false }, cancellationToken);
+        
+        // Apply and append update event
+        var fileUpdateEvent = new FileUpdateEvent(newFile.Id, fileToCopyCid);
+        await newFile.ApplyFileUpdateAsync(fileUpdateEvent, cancellationToken);
+        newFile.EventStreamPosition = await newFile.AppendNewEntryAsync(fileUpdateEvent, cancellationToken);
+        
+        Guard.IsTrue(newFile.Inner.ContentId == fileToCopyCid);
+        return newFile;
+    }
+
+    /// <inheritdoc />
     protected override async Task<NomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> FileDataToInstanceAsync(NomadFileData<Cid> fileData, CancellationToken cancellationToken)
     {
+        var cacheFile = await TempCacheFolder.CreateFileAsync(fileData.StorableItemName, overwrite: false, cancellationToken);
+        
         var file = new KuboNomadFile(ListeningEventStreamHandlers)
         {
+            TempCacheFile = cacheFile,
             Client = Client,
             KuboOptions = KuboOptions,
             Parent = this,
@@ -107,8 +156,11 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <inheritdoc />
     protected override async Task<NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> FolderDataToInstanceAsync(NomadFolderData<Cid> folderData, CancellationToken cancellationToken)
     {
+        var cacheFolder = (IModifiableFolder)await TempCacheFolder.CreateFolderAsync(folderData.StorableItemName, overwrite: false, cancellationToken);
+        
         var folder = new KuboNomadFolder(ListeningEventStreamHandlers)
         {
+            TempCacheFolder = cacheFolder,
             Client = Client,
             KuboOptions = KuboOptions,
             Parent = this,

@@ -14,13 +14,23 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 		<Author>Arlo Godfrey</Author>
-		<Version>0.11.0</Version>
+		<Version>0.12.0</Version>
 		<Product>OwlCore</Product>
 		<Description>A storage implementation powered by shared event sourcing on IPFS.</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
 		<PackageReleaseNotes>
+--- 0.12.0 ---
+[Breaking]
+KuboNomadFolder.TempCacheFolder and KuboNomadFile.TempCacheFile are now required properties. Used for caching during read and persisting writes during flush.
+
+[Fixes]
+Inherits fixes from OwlCore.ComponentModel 0.9.1, addressing an issue where files larger than 2.1GB would fail to read or write.
+
+[Improvements]
+Additional tests and test fixes for large files. 
+
 --- 0.11.0 ---
 [Breaking]
 Inherited breaking changes from OwlCore.Nomad.Kubo 0.12.0. Implemented in unit tests.
@@ -173,9 +183,9 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
-		<PackageReference Include="OwlCore.Kubo" Version="0.17.2" />
-		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.8.0" />
-		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.12.0" />
+		<PackageReference Include="OwlCore.Kubo" Version="0.19.0" />
+		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.8.1" />
+		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.12.1" />
 		<PackageReference Include="PolySharp" Version="1.14.1">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

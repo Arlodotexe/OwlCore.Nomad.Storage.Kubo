@@ -36,7 +36,7 @@ public partial class KuboNomadFolderTests
         {
             var folderToPush = (SystemFolder)await testTempFolder.CreateFolderAsync("in", cancellationToken: cancellationToken);
             await foreach (var file in folderToPush.CreateFilesAsync(5, i => $"{i}", cancellationToken))
-                await file.WriteRandomBytes(numberOfBytes: 4096, cancellationToken);
+                await file.WriteRandomBytes(numberOfBytes: 4096, bufferSize: 4096, cancellationToken);
             
             var folderId = nameof(PushTestAsync);
 
@@ -57,8 +57,13 @@ public partial class KuboNomadFolderTests
                 var roamingACid = await client.Dag.PutAsync(roaming.Value, cancel: cancellationToken, pin: kuboOptions.ShouldPin);
                 _ = await client.Name.PublishAsync(roamingACid, roaming.Key.Name, lifetime: kuboOptions.IpnsLifetime, cancellationToken);
             }
-            
+
             {
+                var mfsRoot = new MfsFolder("/", client);
+                var cacheFolder = (IModifiableFolder)await mfsRoot.CreateFolderAsync(".cache", cancellationToken: cancellationToken);
+                cacheFolder = (IModifiableFolder)await cacheFolder.CreateFolderAsync("nomad", cancellationToken: cancellationToken);
+                cacheFolder = (IModifiableFolder)await cacheFolder.CreateFolderAsync(roaming.Key.Id, cancellationToken: cancellationToken);
+                
                 var sharedEventStreamHandlers = new List<ISharedEventStreamHandler<Cid, EventStream<Cid>, EventStreamEntry<Cid>>>();
                 var nomadFolder = new KuboNomadFolder(sharedEventStreamHandlers)
                 {
@@ -72,6 +77,7 @@ public partial class KuboNomadFolderTests
                     Client = client,
                     KuboOptions = kuboOptions,
                     Parent = null,
+                    TempCacheFolder = cacheFolder,
                 };
                 
                 // Push and Publish
