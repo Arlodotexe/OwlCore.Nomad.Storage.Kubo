@@ -14,13 +14,20 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 		<Author>Arlo Godfrey</Author>
-		<Version>0.12.0</Version>
+		<Version>0.13.0</Version>
 		<Product>OwlCore</Product>
 		<Description>A storage implementation powered by shared event sourcing on IPFS.</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
 		<PackageReleaseNotes>
+--- 0.13.0 ---
+[Breaking]
+Removed static NomadStorageKeys helper, ported to OwlCore.Nomad.Kubo 0.13.0.
+
+[Improvements]
+Updated to / inherited changes from OwlCore.Nomad.Kubo 0.13.0.
+
 --- 0.12.0 ---
 [Breaking]
 KuboNomadFolder.TempCacheFolder and KuboNomadFile.TempCacheFile are now required properties. Used for caching during read and persisting writes during flush.
@@ -185,7 +192,7 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
 		<PackageReference Include="OwlCore.Kubo" Version="0.19.0" />
 		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.8.1" />
-		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.12.1" />
+		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.13.0" />
 		<PackageReference Include="PolySharp" Version="1.14.1">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
