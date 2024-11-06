@@ -23,6 +23,43 @@ namespace OwlCore.Nomad.Storage.Kubo;
 public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableKuboNomadFolder, ICreateCopyOf
 {
     /// <summary>
+    /// Creates a new instance of <see cref="KuboNomadFolder"/> from the specified handler configuration.
+    /// </summary>
+    /// <param name="handlerConfig">The handler configuration to use.</param>
+    /// <param name="tempCacheFolder">A temp folder for caching during read and persisting writes during flush.  </param>
+    /// <param name="parent">The parent of this folder, if any.</param>
+    /// <param name="kuboOptions">The options used to read and write data to and from Kubo.</param>
+    /// <param name="client">The IPFS client used to interact with the network.</param>
+    /// <returns>A new instance of <see cref="KuboNomadFolder"/>.</returns>
+    public static KuboNomadFolder FromHandlerConfig(NomadKuboEventStreamHandlerConfig<NomadFolderData<Cid>> handlerConfig, IModifiableFolder tempCacheFolder, IFolder? parent, IKuboOptions kuboOptions, ICoreApi client)
+    {
+        Guard.IsNotNull(handlerConfig.RoamingValue);
+        Guard.IsNotNull(handlerConfig.RoamingKey);
+        Guard.IsNotNull(handlerConfig.LocalValue);
+        Guard.IsNotNull(handlerConfig.LocalKey);
+
+        return new KuboNomadFolder(handlerConfig.ListeningEventStreamHandlers)
+        {
+            Parent = parent,
+            TempCacheFolder = tempCacheFolder,
+            EventStreamHandlerId = handlerConfig.RoamingKey.Id,
+            Inner = new()
+            {
+                StorableItemId = handlerConfig.RoamingValue.StorableItemId, 
+                StorableItemName = handlerConfig.RoamingValue.StorableItemName,
+                Sources = handlerConfig.RoamingValue.Sources
+            },
+            LocalEventStream = handlerConfig.LocalValue,
+            RoamingKey = handlerConfig.RoamingKey,
+            LocalEventStreamKey = handlerConfig.LocalKey,
+            AllEventStreamEntries = handlerConfig.AllEventStreamEntries,
+            Sources = handlerConfig.RoamingValue.Sources,
+            KuboOptions = kuboOptions,
+            Client = client,
+        };
+    }
+    
+    /// <summary>
     /// Creates a new instance of <see cref="KuboNomadFolder"/>.
     /// </summary>
     /// <param name="listeningEventStreamHandlers">The shared collection of known nomad event streams participating in event seeking.</param>

@@ -11,6 +11,7 @@ using OwlCore.Kubo;
 using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Kubo.Extensions;
 using OwlCore.Nomad.Storage.Kubo.Models;
+using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage;
 using SharpCompress.IO;
 
@@ -21,6 +22,43 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// </summary>
 public class KuboNomadFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableKuboNomadFile, IFlushable, IGetCid
 {
+    /// <summary>
+    /// Creates a new instance of <see cref="KuboNomadFolder"/> from the specified handler configuration.
+    /// </summary>
+    /// <param name="handlerConfig">The handler configuration to use.</param>
+    /// <param name="parent">The parent folder of this file.</param>
+    /// <param name="tempCacheFile">A file to use for seeking reads and holding writes until flush. </param>
+    /// <param name="kuboOptions">The options used to read and write data to and from Kubo.</param>
+    /// <param name="client">The IPFS client used to interact with the network.</param>
+    /// <returns>A new instance of <see cref="KuboNomadFolder"/>.</returns>
+    public static KuboNomadFile FromHandlerConfig(NomadKuboEventStreamHandlerConfig<NomadFileData<Cid>> handlerConfig, IFolder parent, IFile tempCacheFile, IKuboOptions kuboOptions, ICoreApi client)
+    {
+        Guard.IsNotNull(handlerConfig.RoamingValue);
+        Guard.IsNotNull(handlerConfig.RoamingKey);
+        Guard.IsNotNull(handlerConfig.LocalValue);
+        Guard.IsNotNull(handlerConfig.LocalKey);
+
+        return new KuboNomadFile(handlerConfig.ListeningEventStreamHandlers)
+        {
+            Parent = parent,
+            EventStreamHandlerId = handlerConfig.RoamingKey.Id,
+            Inner = new()
+            {
+                StorableItemId = handlerConfig.RoamingValue.StorableItemId,
+                StorableItemName = handlerConfig.RoamingValue.StorableItemName,
+                ContentId = null,
+            },
+            LocalEventStream = handlerConfig.LocalValue,
+            RoamingKey = handlerConfig.RoamingKey,
+            LocalEventStreamKey = handlerConfig.LocalKey,
+            AllEventStreamEntries = handlerConfig.AllEventStreamEntries,
+            Sources = [],
+            KuboOptions = kuboOptions,
+            Client = client,
+            TempCacheFile = tempCacheFile,
+        };
+    }
+    
     /// <summary>
     /// Creates a new instance of <see cref="KuboNomadFile"/>.
     /// </summary>
