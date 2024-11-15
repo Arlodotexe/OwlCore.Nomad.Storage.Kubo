@@ -20,52 +20,38 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TContentPointer, TEventStream, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
 /// </summary>
-public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableKuboNomadFolder, ICreateCopyOf
+public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableNomadKuboFolder, ICreateCopyOf
 {
     /// <summary>
-    /// Creates a new instance of <see cref="KuboNomadFolder"/> from the specified handler configuration.
+    /// Creates a new instance of <see cref="NomadKuboFolder"/> from the specified handler configuration.
     /// </summary>
     /// <param name="handlerConfig">The handler configuration to use.</param>
-    /// <param name="tempCacheFolder">A temp folder for caching during read and persisting writes during flush.  </param>
-    /// <param name="parent">The parent of this folder, if any.</param>
+    /// <param name="tempCacheFolder">The folder to use for caching reads and writes.</param>
     /// <param name="kuboOptions">The options used to read and write data to and from Kubo.</param>
     /// <param name="client">The IPFS client used to interact with the network.</param>
-    /// <returns>A new instance of <see cref="KuboNomadFolder"/>.</returns>
-    public static KuboNomadFolder FromHandlerConfig(NomadKuboEventStreamHandlerConfig<NomadFolderData<Cid>> handlerConfig, IModifiableFolder tempCacheFolder, IFolder? parent, IKuboOptions kuboOptions, ICoreApi client)
+    /// <returns>A new instance of <see cref="NomadKuboFolder"/>.</returns>
+    public static NomadKuboFolder FromHandlerConfig(NomadKuboEventStreamHandlerConfig<NomadFolderData<Cid>> handlerConfig, IModifiableFolder tempCacheFolder, IKuboOptions kuboOptions, ICoreApi client)
     {
         Guard.IsNotNull(handlerConfig.RoamingValue);
         Guard.IsNotNull(handlerConfig.RoamingKey);
         Guard.IsNotNull(handlerConfig.LocalValue);
         Guard.IsNotNull(handlerConfig.LocalKey);
 
-        return new KuboNomadFolder(handlerConfig.ListeningEventStreamHandlers)
+        return new NomadKuboFolder
         {
-            Parent = parent,
+            // Only a root-level event stream handler can be created from a config.
+            Parent = null,
             TempCacheFolder = tempCacheFolder,
             EventStreamHandlerId = handlerConfig.RoamingKey.Id,
-            Inner = new()
-            {
-                StorableItemId = handlerConfig.RoamingValue.StorableItemId, 
-                StorableItemName = handlerConfig.RoamingValue.StorableItemName,
-                Sources = handlerConfig.RoamingValue.Sources
-            },
-            LocalEventStream = handlerConfig.LocalValue,
+            Inner = handlerConfig.RoamingValue,
             RoamingKey = handlerConfig.RoamingKey,
-            LocalEventStreamKey = handlerConfig.LocalKey,
-            AllEventStreamEntries = handlerConfig.AllEventStreamEntries,
             Sources = handlerConfig.RoamingValue.Sources,
+            LocalEventStreamKey = handlerConfig.LocalKey,
+            LocalEventStream = handlerConfig.LocalValue,
+            ResolvedEventStreamEntries = handlerConfig.ResolvedEventStreamEntries,
             KuboOptions = kuboOptions,
             Client = client,
         };
-    }
-    
-    /// <summary>
-    /// Creates a new instance of <see cref="KuboNomadFolder"/>.
-    /// </summary>
-    /// <param name="listeningEventStreamHandlers">The shared collection of known nomad event streams participating in event seeking.</param>
-    public KuboNomadFolder(ICollection<ISharedEventStreamHandler<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> listeningEventStreamHandlers)
-        : base(listeningEventStreamHandlers)
-    {
     }
 
     /// <inheritdoc/>
@@ -84,6 +70,11 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// A temp folder for caching during read and persisting writes during flush.  
     /// </summary>
     public required IModifiableFolder TempCacheFolder { get; init; }
+
+    /// <summary>
+    /// The resolved event stream entries.
+    /// </summary>
+    public ICollection<EventStreamEntry<Cid>>? ResolvedEventStreamEntries { get; set; } = [];
 
     /// <summary>
     /// The interval that IPNS should be checked for updates.
@@ -105,9 +96,9 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
         // Use extension methods for code deduplication (can't use inheritance).
         return updateEventContent switch
         {
-            CreateFileInFolderEvent createFileInFolderEvent => this.ApplyFolderUpdateAsync(createFileInFolderEvent, cancellationToken),
-            CreateFolderInFolderEvent createFolderInFolderEvent => this.ApplyFolderUpdateAsync(createFolderInFolderEvent, cancellationToken),
-            DeleteFromFolderEvent deleteFromFolderEvent => this.ApplyFolderUpdateAsync(deleteFromFolderEvent, cancellationToken),
+            CreateFileInFolderEvent createFileInFolderEvent => ApplyFolderUpdateAsync(createFileInFolderEvent, cancellationToken),
+            CreateFolderInFolderEvent createFolderInFolderEvent => ApplyFolderUpdateAsync(createFolderInFolderEvent, cancellationToken),
+            DeleteFromFolderEvent deleteFromFolderEvent => ApplyFolderUpdateAsync(deleteFromFolderEvent, cancellationToken),
             _ => throw new ArgumentOutOfRangeException($"Unhandled {nameof(FolderUpdateEvent)} type {updateEventContent.GetType()}."),
         };
     }
@@ -145,7 +136,7 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
         EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
         Guard.IsNotNull(createdFileData);
         
-        var newFile = (KuboNomadFile)await FileDataToInstanceAsync(createdFileData, cancellationToken);
+        var newFile = (NomadKuboFile)await FileDataToInstanceAsync(createdFileData, cancellationToken);
         
         // Populate file cid.
         var fileToCopyCid = await fileToCopy.GetCidAsync(Client, new AddFileOptions { Pin = KuboOptions.ShouldPin, OnlyHash = false }, cancellationToken);
@@ -164,7 +155,7 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     {
         var cacheFile = await TempCacheFolder.CreateFileAsync(fileData.StorableItemName, overwrite: false, cancellationToken);
         
-        var file = new KuboNomadFile(ListeningEventStreamHandlers)
+        var file = new NomadKuboFile
         {
             TempCacheFile = cacheFile,
             Client = Client,
@@ -175,16 +166,16 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
             LocalEventStreamKey = LocalEventStreamKey,
             RoamingKey = RoamingKey,
             EventStreamHandlerId = EventStreamHandlerId,
-            AllEventStreamEntries = AllEventStreamEntries,
             LocalEventStream = LocalEventStream,
         };
         
         Guard.IsNotNull(EventStreamPosition?.TimestampUtc);
+        Guard.IsNotNull(ResolvedEventStreamEntries);
 
         // Modifiable data cannot read remote changes from the roaming snapshot.
         // Event stream must be advanced using known sources.
         // Resolved event stream entries are passed down the same as sources are.
-        foreach (var entry in AllEventStreamEntries.ToArray().OrderBy(x => x.TimestampUtc).Where(x=> x.TargetId == file.Id))
+        foreach (var entry in ResolvedEventStreamEntries.ToArray().OrderBy(x => x.TimestampUtc).Where(x=> x.TargetId == file.Id))
             await file.AdvanceEventStreamAsync(entry, cancellationToken);
 
         return file;
@@ -195,7 +186,7 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     {
         var cacheFolder = (IModifiableFolder)await TempCacheFolder.CreateFolderAsync(folderData.StorableItemName, overwrite: false, cancellationToken);
         
-        var folder = new KuboNomadFolder(ListeningEventStreamHandlers)
+        var folder = new NomadKuboFolder
         {
             TempCacheFolder = cacheFolder,
             Client = Client,
@@ -205,17 +196,18 @@ public class KuboNomadFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
             Inner = folderData,
             LocalEventStreamKey = LocalEventStreamKey,
             RoamingKey = RoamingKey,
-            AllEventStreamEntries = AllEventStreamEntries,
+            ResolvedEventStreamEntries = ResolvedEventStreamEntries,
             EventStreamHandlerId = EventStreamHandlerId,
             LocalEventStream = LocalEventStream,
         };
         
         Guard.IsNotNull(EventStreamPosition?.TimestampUtc);
+        Guard.IsNotNull(ResolvedEventStreamEntries);
 
         // Modifiable data cannot read remote changes from the roaming snapshot.
         // Event stream must be advanced using known sources.
         // Resolved event stream entries are passed down the same as sources are.
-        foreach (var entry in AllEventStreamEntries.ToArray().OrderBy(x => x.TimestampUtc).Where(x=> x.TargetId == folder.Id))
+        foreach (var entry in ResolvedEventStreamEntries.ToArray().OrderBy(x => x.TimestampUtc).Where(x=> x.TargetId == folder.Id))
             await folder.AdvanceEventStreamAsync(entry, cancellationToken);
 
         return folder;

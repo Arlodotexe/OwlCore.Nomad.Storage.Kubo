@@ -13,7 +13,7 @@ namespace OwlCore.Nomad.Storage.Kubo.Extensions;
 /// <summary>
 /// Extension methods for kubo-based nomad storage implementations.
 /// </summary>
-public static class KuboBasedNomadStorageExtensions
+public static class NomadKuboStorageExtensions
 {
     /// <summary>
     /// Attempts to advance the event stream position for the <paramref name="file"/> using the data from the given <paramref name="eventEntry"/>. 
@@ -22,7 +22,7 @@ public static class KuboBasedNomadStorageExtensions
     /// <param name="eventEntry">The event entry to apply to the given <paramref name="file"/>.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
     /// <exception cref="InvalidOperationException">Raised when the <see cref="EventStreamEntry{TContentPointer}.TargetId"/> doesn't match the <see cref="OwlCore.Storage.IStorable.Id"/> of the provided <paramref name="file"/>.</exception>
-    public static async Task TryAdvanceEventStreamAsync(this IModifiableKuboNomadFile file, EventStreamEntry<Cid> eventEntry, CancellationToken cancellationToken)
+    public static async Task TryAdvanceEventStreamAsync(this IModifiableNomadKuboFile file, EventStreamEntry<Cid> eventEntry, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         
@@ -45,7 +45,7 @@ public static class KuboBasedNomadStorageExtensions
     /// <param name="eventEntry">The event entry to apply to the given <paramref name="folder"/>.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
     /// <exception cref="InvalidOperationException">Raised when the <see cref="EventStreamEntry{TContentPointer}.TargetId"/> doesn't match the <see cref="OwlCore.Storage.IStorable.Id"/> of the provided <paramref name="folder"/>.</exception>
-    public static async Task TryAdvanceEventStreamAsync(this IModifiableKuboNomadFolder folder, EventStreamEntry<Cid> eventEntry, CancellationToken cancellationToken)
+    public static async Task TryAdvanceEventStreamAsync(this IModifiableNomadKuboFolder folder, EventStreamEntry<Cid> eventEntry, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         
@@ -71,7 +71,7 @@ public static class KuboBasedNomadStorageExtensions
     /// <param name="nomadFile">The file to operate in.</param>
     /// <param name="updateEvent">The event content to apply without side effects.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing task.</param>
-    public static Task ApplyFileUpdateAsync(this IReadOnlyKuboNomadFile nomadFile, FileUpdateEvent updateEvent, CancellationToken cancellationToken)
+    public static Task ApplyFileUpdateAsync(this IReadOnlyNomadKuboFile nomadFile, FileUpdateEvent updateEvent, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -82,32 +82,6 @@ public static class KuboBasedNomadStorageExtensions
         // Apply file updates
         nomadFile.Inner.ContentId = updateEvent.NewContentId;
         Guard.IsNotEqualTo("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", updateEvent.NewContentId.ToString());
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Applies the provided <paramref name="updateEvent"/> in the provided <paramref name="nomadFolder"/>.
-    /// </summary>
-    /// <param name="nomadFolder">The folder to operate in.</param>
-    /// <param name="updateEvent">The event content to apply without side effects.</param>
-    /// <param name="cancellationToken">A token that can be used to cancel the ongoing task.</param>
-    public static Task ApplyFolderUpdateAsync(this IReadOnlyKuboBasedNomadFolder nomadFolder, DeleteFromFolderEvent updateEvent, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        
-        // If deleted, it should already exist in the folder.
-        // Remove the item if it exists.
-        // If it doesn't exist, it may have been removed in another timeline (by another peer).
-        // Folders
-        var targetFolder = nomadFolder.Inner.Folders.FirstOrDefault(x => x.StorableItemId == updateEvent.StorableItemId || x.StorableItemName == updateEvent.StorableItemName);
-        if (targetFolder is not null)
-            nomadFolder.Inner.Folders.Remove(targetFolder);
-        
-        // Files
-        var targetFile = nomadFolder.Inner.Files.FirstOrDefault(x=> x.StorableItemId == updateEvent.StorableItemId || updateEvent.StorableItemName == x.StorableItemName);
-        if (targetFile is not null)
-            nomadFolder.Inner.Files.Remove(targetFile);
-
         return Task.CompletedTask;
     }
 }

@@ -15,23 +15,23 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A virtual folder constructed by reading the roaming <see cref="NomadFolderData{TContentPointer}"/> published by another node.
 /// </summary>
-public class ReadOnlyKuboNomadFolder : IChildFolder, IDelegable<NomadFolderData<Cid>>, IGetRoot
+public class ReadOnlyNomadKuboFolder : IChildFolder, IDelegable<NomadFolderData<Cid>>, IGetRoot
 {
     /// <summary>
-    /// Creates a new instance of <see cref="ReadOnlyKuboNomadFolder"/> from the given handler configuration.
+    /// Creates a new instance of <see cref="ReadOnlyNomadKuboFolder"/> from the given handler configuration.
     /// </summary>
     /// <param name="handlerConfig">The handler configuration to use.</param>
-    /// <param name="parent">The parent of this folder, if any.</param>
     /// <param name="client">A client that can be used for accessing ipfs.</param>
-    /// <returns>A new instance of <see cref="ReadOnlyKuboNomadFolder"/>.</returns>
-    public static ReadOnlyKuboNomadFolder FromHandlerConfig(NomadKuboEventStreamHandlerConfig<NomadFolderData<Cid>> handlerConfig, IFolder? parent, ICoreApi client)
+    /// <returns>A new instance of <see cref="ReadOnlyNomadKuboFolder"/>.</returns>
+    public static ReadOnlyNomadKuboFolder FromHandlerConfig(NomadKuboEventStreamHandlerConfig<NomadFolderData<Cid>> handlerConfig, ICoreApi client)
     {
         Guard.IsNotNull(handlerConfig.RoamingValue);
         Guard.IsNotNull(handlerConfig.RoamingId);
 
-        return new ReadOnlyKuboNomadFolder
+        return new ReadOnlyNomadKuboFolder
         {
-            Parent = parent,
+            // Only a root-level event stream handler (or equivalent in the case of read-only) can be created from a config.
+            Parent = null,
             Client = client,
             Inner = handlerConfig.RoamingValue,
         };
@@ -66,7 +66,7 @@ public class ReadOnlyKuboNomadFolder : IChildFolder, IDelegable<NomadFolderData<
         {
             foreach (var file in Inner.Files)
             {
-                yield return new ReadOnlyKuboNomadFile
+                yield return new ReadOnlyNomadKuboFile
                 {
                     Client = Client,
                     Inner = file,
@@ -79,7 +79,7 @@ public class ReadOnlyKuboNomadFolder : IChildFolder, IDelegable<NomadFolderData<
         {
             foreach (var folder in Inner.Folders)
             {
-                yield return new ReadOnlyKuboNomadFolder
+                yield return new ReadOnlyNomadKuboFolder
                 {
                     Client = Client,
                     Inner = folder,
@@ -90,7 +90,7 @@ public class ReadOnlyKuboNomadFolder : IChildFolder, IDelegable<NomadFolderData<
     }
 
     /// <inheritdoc />
-    public Task<IFolder?> GetParentAsync(CancellationToken cancellationToken = default) => Task.FromResult<IFolder?>(Parent);
+    public Task<IFolder?> GetParentAsync(CancellationToken cancellationToken = default) => Task.FromResult(Parent);
 
     /// <inheritdoc />
     public Task<IFolder?> GetRootAsync(CancellationToken cancellationToken = default)
@@ -102,7 +102,7 @@ public class ReadOnlyKuboNomadFolder : IChildFolder, IDelegable<NomadFolderData<
         // At least one parent is required for a root to exist
         // Crawl up and return where parent is null
         var current = this;
-        while (current.Parent is ReadOnlyKuboNomadFolder parent)
+        while (current.Parent is ReadOnlyNomadKuboFolder parent)
         {
             current = parent;
         }

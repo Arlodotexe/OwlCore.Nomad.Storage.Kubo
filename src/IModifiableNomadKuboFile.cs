@@ -7,7 +7,7 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A modifiable kubo-based storage interface for files.
 /// </summary>
-public interface IModifiableKuboNomadFile : INomadKuboEventStreamHandler<FileUpdateEvent>, IReadOnlyKuboNomadFile
+public interface IModifiableNomadKuboFile : INomadKuboEventStreamHandler<FileUpdateEvent>, IReadOnlyNomadKuboFile
 {
     /// <summary>
     /// A file to use for seeking reads and holding writes until flush. 
