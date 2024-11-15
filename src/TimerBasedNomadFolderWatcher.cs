@@ -6,7 +6,7 @@ using OwlCore.Kubo.FolderWatchers;
 namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
-/// A timer-based folder watcher that watches a <see cref="ReadOnlyKuboNomadFolder"/>.
+/// A timer-based folder watcher that watches a <see cref="ReadOnlyNomadKuboFolder"/>.
 /// </summary>
 public class TimerBasedNomadFolderWatcher : TimerBasedFolderWatcher
 {
@@ -15,7 +15,7 @@ public class TimerBasedNomadFolderWatcher : TimerBasedFolderWatcher
     /// </summary>
     /// <param name="kuboNomadFolder">The folder to watch.</param>
     /// <param name="interval">The update interval.</param>
-    public TimerBasedNomadFolderWatcher(IReadOnlyKuboBasedNomadFolder kuboNomadFolder, TimeSpan interval) : base(kuboNomadFolder, interval)
+    public TimerBasedNomadFolderWatcher(IReadOnlyNomadKuboFolder kuboNomadFolder, TimeSpan interval) : base(kuboNomadFolder, interval)
     {
     }
 

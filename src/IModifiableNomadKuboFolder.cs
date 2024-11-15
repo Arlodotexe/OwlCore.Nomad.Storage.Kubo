@@ -7,7 +7,7 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A modifiable kubo-based storage interface for folders.
 /// </summary>
-public interface IModifiableKuboNomadFolder : IReadOnlyKuboBasedNomadFolder, INomadKuboEventStreamHandler<FolderUpdateEvent>, IModifiableFolder
+public interface IModifiableNomadKuboFolder : IReadOnlyNomadKuboFolder, INomadKuboEventStreamHandler<FolderUpdateEvent>, IModifiableFolder
 {
     /// <summary>
     /// A temp folder for caching during read and persisting writes during flush.  
