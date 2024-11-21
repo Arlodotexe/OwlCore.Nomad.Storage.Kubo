@@ -27,8 +27,9 @@ public static class StorageRepoFactory
     {
         return new NomadKuboRepository<NomadKuboFolder, IFolder, NomadFolderData<Cid>, FolderUpdateEvent>
         {
-            DefaultEventStreamLabel = folderName,
+            DefaultEventStreamLabel = $"Folder {folderName}",
             Client = client,
+            KuboOptions = kuboOptions,
             GetEventStreamHandlerConfigAsync = async (roamingId, cancellationToken) =>
             {
                 var (localKey, roamingKey, foundRoamingId) = await NomadKeyHelpers.RoamingIdToNomadKeysAsync(roamingId, roamingKeyName, localKeyName, client, cancellationToken);
