@@ -3,7 +3,6 @@ using CommunityToolkit.Diagnostics;
 using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.Kubo;
-using OwlCore.Kubo.Cache;
 using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage.System.IO;
@@ -13,7 +12,7 @@ using OwlCore.Storage;
 namespace OwlCore.Nomad.Storage.Kubo.Tests;
 
 [TestClass]
-public partial class KuboNomadFolderTests
+public partial class NomadKuboFolderTests
 {
     private void LoggerOnMessageReceived(object? sender, LoggerMessageEventArgs args) => Debug.WriteLine(args.Message);
 
@@ -121,10 +120,10 @@ public partial class KuboNomadFolderTests
     {
         return storable switch
         {
-            KuboNomadFile nFile => eventStreamEntries.Where(x => x.TargetId == nFile.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
-            KuboNomadFolder nFolder => eventStreamEntries.Where(x => x.TargetId == nFolder.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
-            ReadOnlyKuboNomadFile nFile => eventStreamEntries.Where(x => x.TargetId == nFile.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
-            ReadOnlyKuboNomadFolder nFolder => eventStreamEntries.Where(x => x.TargetId == nFolder.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
+            NomadKuboFile nFile => eventStreamEntries.Where(x => x.TargetId == nFile.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
+            NomadKuboFolder nFolder => eventStreamEntries.Where(x => x.TargetId == nFolder.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
+            ReadOnlyNomadKuboFile nFile => eventStreamEntries.Where(x => x.TargetId == nFile.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
+            ReadOnlyNomadKuboFolder nFolder => eventStreamEntries.Where(x => x.TargetId == nFolder.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
             SystemFolder systemFolder => systemFolder.Info.LastWriteTimeUtc,
             SystemFile systemFile => systemFile.Info.LastWriteTimeUtc,
             _ => throw new ArgumentOutOfRangeException(nameof(storable), storable, null)
@@ -181,14 +180,5 @@ public partial class KuboNomadFolderTests
                 
         await kubo.StartAsync(cancellationToken);
         return kubo;
-    }
-    
-    private static async Task<CachedCoreApi> CreateCachedClientAsync(KuboBootstrapper kubo, CancellationToken cancellationToken)
-    {
-        var cacheFolder = (SystemFolder)await kubo.RepoFolder.CreateFolderAsync(".cache", overwrite: false, cancellationToken: cancellationToken);
-        var cacheLayer = new CachedCoreApi(cacheFolder, kubo.Client);
-
-        await cacheLayer.InitAsync(cancellationToken);
-        return cacheLayer;
     }
 }
