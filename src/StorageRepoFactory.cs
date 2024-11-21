@@ -31,7 +31,7 @@ public static class StorageRepoFactory
             Client = client,
             GetEventStreamHandlerConfigAsync = async (roamingId, cancellationToken) =>
             {
-                var (localKey, roamingKey, foundRoamingId) = await NomadKeyHelpers.RoamingIdToNomadKeysAsync(roamingId, localKeyName, roamingKeyName, client, cancellationToken);
+                var (localKey, roamingKey, foundRoamingId) = await NomadKeyHelpers.RoamingIdToNomadKeysAsync(roamingId, roamingKeyName, localKeyName, client, cancellationToken);
                 return new NomadKuboEventStreamHandlerConfig<NomadFolderData<Cid>>
                 {
                     RoamingId = roamingKey?.Id ?? foundRoamingId,
