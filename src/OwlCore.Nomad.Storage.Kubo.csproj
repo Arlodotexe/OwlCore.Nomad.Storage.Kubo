@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<TargetFrameworks>netstandard2.0;net8.0;net9.0;</TargetFrameworks>
 		<Nullable>enable</Nullable>
@@ -14,13 +14,22 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 		<Author>Arlo Godfrey</Author>
-		<Version>0.13.0</Version>
+		<Version>0.14.0</Version>
 		<Product>OwlCore</Product>
-		<Description>A storage implementation powered by shared event sourcing on IPFS.</Description>
+		<Description>A storage implementation powered by Nomad event sourcing on ipfs/Kubo.</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
 		<PackageReleaseNotes>
+--- 0.14.0 ---
+[Breaking]
+Inherited and implemented breaking changes from OwlCore.Nomad 0.9.0 and OwlCore.Nomad.Storage 0.14.0.
+All types that were using *KuboNomad* are now using *NomadKubo*. This reflects the namespace of the type and will be a consistent pattern moving forward.
+
+[New]
+Added a static StorageRepoFactory helper to create repos manage the lifecycle of owned root-level event stream handlers.
+NomadKuboFolder now implements OwlCore.ComponentModel.IFlushable, allowing you to publish the event stream and roaming data without hassle. 
+
 --- 0.13.0 ---
 [Breaking]
 Removed static NomadStorageKeys helper, ported to OwlCore.Nomad.Kubo 0.13.0.
@@ -190,6 +199,8 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.0" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+	    <PackageReference Include="OwlCore.Nomad.Storage" Version="0.9.0" />
+	    <PackageReference Include="OwlCore.Nomad.Kubo" Version="0.14.0" />
 		<PackageReference Include="PolySharp" Version="1.14.1">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -198,14 +209,9 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Update="logo.png">
+	  <None Include="logo.png">
 	    <Pack>True</Pack>
 	    <PackagePath>\</PackagePath>
 	  </None>
-	</ItemGroup>
-
-	<ItemGroup>
-	  <ProjectReference Include="..\..\ocnomadkubo\src\OwlCore.Nomad.Kubo.csproj" />
-	  <ProjectReference Include="..\..\ocnomadstorage\src\OwlCore.Nomad.Storage.csproj" />
 	</ItemGroup>
 </Project>
