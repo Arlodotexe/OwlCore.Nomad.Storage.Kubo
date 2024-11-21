@@ -20,7 +20,7 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TContentPointer, TEventStream, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
 /// </summary>
-public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableNomadKuboFolder, ICreateCopyOf
+public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableNomadKuboFolder, ICreateCopyOf, IFlushable
 {
     /// <summary>
     /// Creates a new instance of <see cref="NomadKuboFolder"/> from the specified handler configuration.
@@ -65,7 +65,7 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
 
     /// <inheritdoc />
     public required IKey RoamingKey { get; init; }
-    
+
     /// <summary>
     /// A temp folder for caching during read and persisting writes during flush.  
     /// </summary>
@@ -106,6 +106,7 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <inheritdoc />
     public override Task AdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return this.TryAdvanceEventStreamAsync(streamEntry, cancellationToken);
     }
 
@@ -131,21 +132,21 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
 
         // Create the destination file.
         var storageUpdateEvent = new CreateFileInFolderEvent(Id, $"{Id}/{fileToCopy.Name}", fileToCopy.Name, overwrite);
-        
+
         var createdFileData = await ApplyFolderUpdateAsync(storageUpdateEvent, cancellationToken);
         EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
         Guard.IsNotNull(createdFileData);
-        
+
         var newFile = (NomadKuboFile)await FileDataToInstanceAsync(createdFileData, cancellationToken);
-        
+
         // Populate file cid.
         var fileToCopyCid = await fileToCopy.GetCidAsync(Client, new AddFileOptions { Pin = KuboOptions.ShouldPin, OnlyHash = false }, cancellationToken);
-        
+
         // Apply and append update event
         var fileUpdateEvent = new FileUpdateEvent(newFile.Id, fileToCopyCid);
         await newFile.ApplyFileUpdateAsync(fileUpdateEvent, cancellationToken);
         newFile.EventStreamPosition = await newFile.AppendNewEntryAsync(fileUpdateEvent, cancellationToken);
-        
+
         Guard.IsTrue(newFile.Inner.ContentId == fileToCopyCid);
         return newFile;
     }
@@ -153,8 +154,9 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <inheritdoc />
     protected override async Task<NomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> FileDataToInstanceAsync(NomadFileData<Cid> fileData, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var cacheFile = await TempCacheFolder.CreateFileAsync(fileData.StorableItemName, overwrite: false, cancellationToken);
-        
+
         var file = new NomadKuboFile
         {
             TempCacheFile = cacheFile,
@@ -168,14 +170,14 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
             EventStreamHandlerId = EventStreamHandlerId,
             LocalEventStream = LocalEventStream,
         };
-        
+
         Guard.IsNotNull(EventStreamPosition?.TimestampUtc);
         Guard.IsNotNull(ResolvedEventStreamEntries);
 
         // Modifiable data cannot read remote changes from the roaming snapshot.
         // Event stream must be advanced using known sources.
         // Resolved event stream entries are passed down the same as sources are.
-        foreach (var entry in ResolvedEventStreamEntries.ToArray().OrderBy(x => x.TimestampUtc).Where(x=> x.TargetId == file.Id))
+        foreach (var entry in ResolvedEventStreamEntries.ToArray().OrderBy(x => x.TimestampUtc).Where(x => x.TargetId == file.Id))
             await file.AdvanceEventStreamAsync(entry, cancellationToken);
 
         return file;
@@ -184,8 +186,9 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <inheritdoc />
     protected override async Task<NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> FolderDataToInstanceAsync(NomadFolderData<Cid> folderData, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var cacheFolder = (IModifiableFolder)await TempCacheFolder.CreateFolderAsync(folderData.StorableItemName, overwrite: false, cancellationToken);
-        
+
         var folder = new NomadKuboFolder
         {
             TempCacheFolder = cacheFolder,
@@ -200,16 +203,34 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
             EventStreamHandlerId = EventStreamHandlerId,
             LocalEventStream = LocalEventStream,
         };
-        
+
         Guard.IsNotNull(EventStreamPosition?.TimestampUtc);
         Guard.IsNotNull(ResolvedEventStreamEntries);
 
         // Modifiable data cannot read remote changes from the roaming snapshot.
         // Event stream must be advanced using known sources.
         // Resolved event stream entries are passed down the same as sources are.
-        foreach (var entry in ResolvedEventStreamEntries.ToArray().OrderBy(x => x.TimestampUtc).Where(x=> x.TargetId == folder.Id))
+        foreach (var entry in ResolvedEventStreamEntries.ToArray().OrderBy(x => x.TimestampUtc).Where(x => x.TargetId == folder.Id))
             await folder.AdvanceEventStreamAsync(entry, cancellationToken);
 
         return folder;
+    }
+
+    /// <inheritdoc/>
+    public async Task FlushAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // If this object is not root, get root.
+        var root = await GetRootAsync(cancellationToken);
+        if (root is NomadKuboFolder target)
+        {
+            await target.FlushAsync(cancellationToken);
+            return;
+        }
+
+        // Publish this as local/roaming data root.
+        await this.PublishLocalAsync<NomadKuboFolder, FolderUpdateEvent>(cancellationToken);
+        await this.PublishRoamingAsync<NomadKuboFolder, FolderUpdateEvent, NomadFolderData<Cid>>(cancellationToken);
     }
 }
