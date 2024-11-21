@@ -18,7 +18,7 @@ using SharpCompress.IO;
 namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
-/// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
+/// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> 
 /// </summary>
 public class NomadKuboFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableNomadKuboFile, IFlushable, IGetCid
 {
