@@ -93,7 +93,6 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <inheritdoc cref="NomadFolder{TContentPointer,TEventStreamSource,TEventStreamEntry}.ApplyEntryUpdateAsync" />
     public override Task ApplyEntryUpdateAsync(FolderUpdateEvent updateEventContent, CancellationToken cancellationToken)
     {
-        // Use extension methods for code deduplication (can't use inheritance).
         return updateEventContent switch
         {
             CreateFileInFolderEvent createFileInFolderEvent => ApplyFolderUpdateAsync(createFileInFolderEvent, cancellationToken),
