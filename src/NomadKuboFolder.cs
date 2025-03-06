@@ -91,14 +91,14 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     }
 
     /// <inheritdoc cref="NomadFolder{TContentPointer,TEventStreamSource,TEventStreamEntry}.ApplyEntryUpdateAsync" />
-    public override Task ApplyEntryUpdateAsync(FolderUpdateEvent updateEventContent, CancellationToken cancellationToken)
+    public override Task ApplyEntryUpdateAsync(FolderUpdateEvent eventEntryContent, CancellationToken cancellationToken)
     {
-        return updateEventContent switch
+        return eventEntryContent switch
         {
             CreateFileInFolderEvent createFileInFolderEvent => ApplyFolderUpdateAsync(createFileInFolderEvent, cancellationToken),
             CreateFolderInFolderEvent createFolderInFolderEvent => ApplyFolderUpdateAsync(createFolderInFolderEvent, cancellationToken),
             DeleteFromFolderEvent deleteFromFolderEvent => ApplyFolderUpdateAsync(deleteFromFolderEvent, cancellationToken),
-            _ => throw new ArgumentOutOfRangeException($"Unhandled {nameof(FolderUpdateEvent)} type {updateEventContent.GetType()}."),
+            _ => throw new ArgumentOutOfRangeException($"Unhandled {nameof(FolderUpdateEvent)} type {eventEntryContent.GetType()}."),
         };
     }
 

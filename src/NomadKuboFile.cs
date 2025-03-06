@@ -131,18 +131,18 @@ public class NomadKuboFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     /// <summary>
     /// Applies the given event entry
     /// </summary>
-    /// <param name="updateEvent"></param>
+    /// <param name="eventEntryContent"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    public Task ApplyEntryUpdateAsync(FileUpdateEvent updateEvent, CancellationToken cancellationToken)
+    public Task ApplyEntryUpdateAsync(FileUpdateEvent eventEntryContent, CancellationToken cancellationToken)
     {
         // Prevent updates intended for other files.
-        if (updateEvent.StorableItemId != Id)
-            throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't designated for this folder and can't be applied.");
+        if (eventEntryContent.StorableItemId != Id)
+            throw new InvalidOperationException($"The provided {nameof(eventEntryContent)} isn't designated for this folder and can't be applied.");
 
         // Apply file updates
-        Inner.ContentId = updateEvent.NewContentId;
+        Inner.ContentId = eventEntryContent.NewContentId;
         return Task.CompletedTask;
     }
 
