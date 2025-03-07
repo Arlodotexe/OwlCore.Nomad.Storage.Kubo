@@ -120,7 +120,7 @@ public partial class NomadKuboFolderTests
                 Guard.IsNotEmpty(eventStreamEntries);
                 
                 var sourceAddEventStreamEntries = eventStreamEntries
-                    .Where(x => x.eventStreamEntry?.EventId == "SourceAddEvent")
+                    .Where(x => x.eventStreamEntry?.EventId == ReservedEventIds.NomadEventStreamSourceAdd)
                     .Where(x=> x.eventStreamEntry is not null)
                     .Cast<(EventStreamEntry<DagCid> eventStreamEntry, DagCid eventStreamEntryCid)>()
                     .ToArray();
