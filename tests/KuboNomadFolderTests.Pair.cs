@@ -112,7 +112,7 @@ public partial class NomadKuboFolderTests
             }
             
             // Verify published local data
-            var (publishedLocalAOnA, _) = await clientA.ResolveDagCidAsync<EventStream<Cid>>(folderA.LocalEventStreamKey.Id, !kuboOptions.UseCache, cancellationToken);
+            var (publishedLocalAOnA, _) = await clientA.ResolveDagCidAsync<EventStream<DagCid>>(folderA.LocalEventStreamKey.Id, !kuboOptions.UseCache, cancellationToken);
             Guard.IsNotNull(publishedLocalAOnA);
             {
                 // Load event stream entries
