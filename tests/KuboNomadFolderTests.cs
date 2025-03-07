@@ -116,7 +116,7 @@ public partial class NomadKuboFolderTests
         return publishedRoaming;
     }
 
-    public static DateTime GetLastWriteTimeFor(IStorable storable, IEnumerable<EventStreamEntry<Cid>> eventStreamEntries)
+    public static DateTime GetLastWriteTimeFor(IStorable storable, IEnumerable<EventStreamEntry<DagCid>> eventStreamEntries)
     {
         return storable switch
         {
