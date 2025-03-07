@@ -18,9 +18,9 @@ using OwlCore.Storage;
 namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
-/// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TContentPointer, TEventStream, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> in concert with other <see cref="ISharedEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry, TListeningHandlers}.ListeningEventStreamHandlers"/>.
+/// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TImmutableContent, TMutableContent, TEventStream, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/>.
 /// </summary>
-public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableNomadKuboFolder, ICreateCopyOf, IFlushable
+public class NomadKuboFolder : NomadFolder<DagCid, Cid, EventStream<DagCid>, EventStreamEntry<DagCid>>, IModifiableNomadKuboFolder, ICreateCopyOf, IFlushable
 {
     /// <summary>
     /// Creates a new instance of <see cref="NomadKuboFolder"/> from the specified handler configuration.
@@ -30,7 +30,7 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <param name="kuboOptions">The options used to read and write data to and from Kubo.</param>
     /// <param name="client">The IPFS client used to interact with the network.</param>
     /// <returns>A new instance of <see cref="NomadKuboFolder"/>.</returns>
-    public static NomadKuboFolder FromHandlerConfig(NomadKuboEventStreamHandlerConfig<NomadFolderData<Cid>> handlerConfig, IModifiableFolder tempCacheFolder, IKuboOptions kuboOptions, ICoreApi client)
+    public static NomadKuboFolder FromHandlerConfig(NomadKuboEventStreamHandlerConfig<NomadFolderData<DagCid, Cid>> handlerConfig, IModifiableFolder tempCacheFolder, IKuboOptions kuboOptions, ICoreApi client)
     {
         Guard.IsNotNull(handlerConfig.RoamingValue);
         Guard.IsNotNull(handlerConfig.RoamingKey);
@@ -74,7 +74,7 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     /// <summary>
     /// The resolved event stream entries.
     /// </summary>
-    public ICollection<EventStreamEntry<Cid>>? ResolvedEventStreamEntries { get; set; } = [];
+    public ICollection<EventStreamEntry<DagCid>>? ResolvedEventStreamEntries { get; set; } = [];
 
     /// <summary>
     /// The interval that IPNS should be checked for updates.
@@ -82,16 +82,16 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     public TimeSpan UpdateCheckInterval { get; } = TimeSpan.FromMinutes(1);
 
     /// <inheritdoc cref="INomadKuboEventStreamHandler{TEventEntryContent}.AppendNewEntryAsync" />
-    public override async Task<EventStreamEntry<Cid>> AppendNewEntryAsync(FolderUpdateEvent updateEvent, CancellationToken cancellationToken = default)
+    public override async Task<EventStreamEntry<DagCid>> AppendNewEntryAsync(string targetId, string eventId, FolderUpdateEvent updateEvent, DateTime? timestampUtc = null, CancellationToken cancellationToken = default)
     {
         // Use extension method for code deduplication (can't use inheritance).
         var localUpdateEventCid = await Client.Dag.PutAsync(updateEvent, pin: KuboOptions.ShouldPin, cancel: cancellationToken);
-        var newEntry = await this.AppendEventStreamEntryAsync(localUpdateEventCid, updateEvent.EventId, targetId: Id, cancellationToken);
+        var newEntry = await this.AppendEventStreamEntryAsync((DagCid)localUpdateEventCid, updateEvent.EventId, targetId: Id, cancellationToken);
         return newEntry;
     }
 
-    /// <inheritdoc cref="NomadFolder{TContentPointer,TEventStreamSource,TEventStreamEntry}.ApplyEntryUpdateAsync" />
-    public override Task ApplyEntryUpdateAsync(FolderUpdateEvent eventEntryContent, CancellationToken cancellationToken)
+    /// <inheritdoc cref="NomadFolder{TImmutablePointer,TMutablePointer,TEventStreamSource,TEventStreamEntry}.ApplyEntryUpdateAsync" />
+    public override Task ApplyEntryUpdateAsync(EventStreamEntry<DagCid> eventStreamEntry, FolderUpdateEvent eventEntryContent, CancellationToken cancellationToken)
     {
         return eventEntryContent switch
         {
@@ -103,7 +103,7 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     }
 
     /// <inheritdoc />
-    public override Task AdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
+    public override Task AdvanceEventStreamAsync(EventStreamEntry<DagCid> streamEntry, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return this.TryAdvanceEventStreamAsync(streamEntry, cancellationToken);
@@ -133,7 +133,7 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
         var storageUpdateEvent = new CreateFileInFolderEvent(Id, $"{Id}/{fileToCopy.Name}", fileToCopy.Name, overwrite);
 
         var createdFileData = await ApplyFolderUpdateAsync(storageUpdateEvent, cancellationToken);
-        EventStreamPosition = await AppendNewEntryAsync(storageUpdateEvent, cancellationToken);
+        EventStreamPosition = await AppendNewEntryAsync(Id, nameof(CreateFileInFolderEvent), storageUpdateEvent, DateTime.UtcNow, cancellationToken);
         Guard.IsNotNull(createdFileData);
 
         var newFile = (NomadKuboFile)await FileDataToInstanceAsync(createdFileData, cancellationToken);
@@ -142,16 +142,16 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
         var fileToCopyCid = await fileToCopy.GetCidAsync(Client, new AddFileOptions { Pin = KuboOptions.ShouldPin, OnlyHash = false }, cancellationToken);
 
         // Apply and append update event
-        var fileUpdateEvent = new FileUpdateEvent(newFile.Id, fileToCopyCid);
+        var fileUpdateEvent = new FileUpdateEvent(newFile.Id, (DagCid)fileToCopyCid);
         await newFile.ApplyFileUpdateAsync(fileUpdateEvent, cancellationToken);
-        newFile.EventStreamPosition = await newFile.AppendNewEntryAsync(fileUpdateEvent, cancellationToken);
+        newFile.EventStreamPosition = await newFile.AppendNewEntryAsync(fileUpdateEvent.StorableItemId, fileUpdateEvent.EventId, fileUpdateEvent, DateTime.UtcNow, cancellationToken);
 
-        Guard.IsTrue(newFile.Inner.ContentId == fileToCopyCid);
+        Guard.IsTrue(newFile.Inner.ContentId == (DagCid)fileToCopyCid);
         return newFile;
     }
 
     /// <inheritdoc />
-    protected override async Task<NomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> FileDataToInstanceAsync(NomadFileData<Cid> fileData, CancellationToken cancellationToken)
+    protected override async Task<NomadFile<DagCid, Cid, EventStream<DagCid>, EventStreamEntry<DagCid>>> FileDataToInstanceAsync(NomadFileData<DagCid> fileData, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var cacheFile = await TempCacheFolder.CreateFileAsync(fileData.StorableItemName, overwrite: false, cancellationToken);
@@ -183,7 +183,7 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
     }
 
     /// <inheritdoc />
-    protected override async Task<NomadFolder<Cid, EventStream<Cid>, EventStreamEntry<Cid>>> FolderDataToInstanceAsync(NomadFolderData<Cid> folderData, CancellationToken cancellationToken)
+    protected override async Task<NomadFolder<DagCid, Cid, EventStream<DagCid>, EventStreamEntry<DagCid>>> FolderDataToInstanceAsync(NomadFolderData<DagCid, Cid> folderData, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var cacheFolder = (IModifiableFolder)await TempCacheFolder.CreateFolderAsync(folderData.StorableItemName, overwrite: false, cancellationToken);
@@ -230,6 +230,6 @@ public class NomadKuboFolder : NomadFolder<Cid, EventStream<Cid>, EventStreamEnt
 
         // Publish this as local/roaming data root.
         await this.PublishLocalAsync<NomadKuboFolder, FolderUpdateEvent>(cancellationToken);
-        await this.PublishRoamingAsync<NomadKuboFolder, FolderUpdateEvent, NomadFolderData<Cid>>(cancellationToken);
+        await this.PublishRoamingAsync<NomadKuboFolder, FolderUpdateEvent, NomadFolderData<DagCid, Cid>>(cancellationToken);
     }
 }

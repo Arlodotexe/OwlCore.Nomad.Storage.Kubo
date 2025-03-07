@@ -8,6 +8,6 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A kubo-based storage interface for files.
 /// </summary>
-public interface IReadOnlyNomadKuboFile : IChildFile, IDelegable<NomadFileData<Cid>>
+public interface IReadOnlyNomadKuboFile : IChildFile, IDelegable<NomadFileData<DagCid>>
 {
 }

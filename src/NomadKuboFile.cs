@@ -11,16 +11,15 @@ using OwlCore.Kubo;
 using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Kubo.Extensions;
 using OwlCore.Nomad.Storage.Kubo.Models;
-using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage;
 using SharpCompress.IO;
 
 namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
-/// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TContentPointer, TEventStreamSource, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/> 
+/// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TImmutablePointer, TMutablePointer, TEventStreamSource, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{TMutablePointer}.Sources"/> 
 /// </summary>
-public class NomadKuboFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<Cid>>, IModifiableNomadKuboFile, IFlushable, IGetCid
+public class NomadKuboFile : NomadFile<DagCid, Cid, EventStream<DagCid>, EventStreamEntry<DagCid>>, IModifiableNomadKuboFile, IFlushable, IGetCid
 {
     /// <inheritdoc/>
     public required IKuboOptions KuboOptions { get; set; }
@@ -42,7 +41,7 @@ public class NomadKuboFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     /// <summary>
     /// The resolved event stream entries.
     /// </summary>
-    public ICollection<EventStreamEntry<Cid>>? ResolvedEventStreamEntries { get; set; } = [];
+    public ICollection<EventStreamEntry<DagCid>>? ResolvedEventStreamEntries { get; set; } = [];
 
     /// <inheritdoc />
     public override async Task<Stream> OpenStreamAsync(FileAccess accessMode = FileAccess.Read, CancellationToken cancellationToken = default)
@@ -108,34 +107,39 @@ public class NomadKuboFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     }
 
     /// <inheritdoc />
-    public override Task AdvanceEventStreamAsync(EventStreamEntry<Cid> streamEntry, CancellationToken cancellationToken)
+    public override Task AdvanceEventStreamAsync(EventStreamEntry<DagCid> streamEntry, CancellationToken cancellationToken)
     {
         // Use extension method for code deduplication (can't use inheritance).
         return this.TryAdvanceEventStreamAsync(streamEntry, cancellationToken);
     }
 
     /// <summary>
-    /// Appends a new <paramref name="updateEvent"/> to the local event stream and updates the current folder.
+    /// Appends a new <paramref name="eventEntryContent"/> to the local event stream and updates the current folder.
     /// </summary>
-    /// <param name="updateEvent">The storage event to apply.</param>
+    /// <param name="targetId">A unique identifier that represents the scope the applied event occurred within.</param>
+    /// <param name="eventId">A unique identifier for the event that occured within this <paramref name="targetId"/>.</param>
+    /// <param name="eventEntryContent">The update event data to apply and persist.</param>
+    /// <param name="timestampUtc">The recorded UTC timestamp when this event entry was applied.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
-    public async Task<EventStreamEntry<Cid>> AppendNewEntryAsync(FileUpdateEvent updateEvent, CancellationToken cancellationToken = default)
+    /// <returns>A task containing the event stream entry that was applied from the update.</returns>
+    public async Task<EventStreamEntry<DagCid>> AppendNewEntryAsync(string targetId, string eventId, FileUpdateEvent eventEntryContent, DateTime? timestampUtc = null, CancellationToken cancellationToken = default)
     {
         // Use extension method for code deduplication (can't use inheritance).
-        var localUpdateEventCid = await Client.Dag.PutAsync(updateEvent, pin: KuboOptions.ShouldPin, cancel: cancellationToken);
+        var localUpdateEventCid = await Client.Dag.PutAsync(eventEntryContent, pin: KuboOptions.ShouldPin, cancel: cancellationToken);
 
-        var newEntry = await this.AppendEventStreamEntryAsync(localUpdateEventCid, updateEvent.EventId, targetId: Id, cancellationToken);
+        var newEntry = await this.AppendEventStreamEntryAsync((DagCid)localUpdateEventCid, eventEntryContent.EventId, targetId: Id, cancellationToken);
         return newEntry;
     }
 
     /// <summary>
     /// Applies the given event entry
     /// </summary>
-    /// <param name="eventEntryContent"></param>
-    /// <param name="cancellationToken"></param>
+    /// <param name="eventStreamEntry">The event stream entry to apply.</param>
+    /// <param name="eventEntryContent">The resolved <see cref="EventStreamEntry{T}.Content"/> to apply.</param>
+    /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
     /// <returns></returns>
-    /// <exception cref="InvalidOperationException"></exception>
-    public Task ApplyEntryUpdateAsync(FileUpdateEvent eventEntryContent, CancellationToken cancellationToken)
+    /// <exception cref="InvalidOperationException">Supplied event stream entry doesn't target this object.</exception>
+    public Task ApplyEntryUpdateAsync(EventStreamEntry<DagCid> eventStreamEntry, FileUpdateEvent eventEntryContent, CancellationToken cancellationToken)
     {
         // Prevent updates intended for other files.
         if (eventEntryContent.StorableItemId != Id)
@@ -154,9 +158,9 @@ public class NomadKuboFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     {
         Cid newCid = await TempCacheFile.GetCidAsync(Client, new AddFileOptions { Pin = KuboOptions.ShouldPin, OnlyHash = false }, cancellationToken);
         
-        var fileUpdateEvent = new FileUpdateEvent(Id, newCid);
-        await ApplyEntryUpdateAsync(fileUpdateEvent, cancellationToken);
-        var appendedEvent = await AppendNewEntryAsync(fileUpdateEvent, cancellationToken);
+        var fileUpdateEvent = new FileUpdateEvent(Id, (DagCid)newCid);
+        var appendedEvent = await AppendNewEntryAsync(fileUpdateEvent.StorableItemId, fileUpdateEvent.EventId, fileUpdateEvent, DateTime.UtcNow, cancellationToken);
+        await ApplyEntryUpdateAsync(appendedEvent, fileUpdateEvent, cancellationToken);
 
         Guard.IsNotNull(Inner.ContentId);
         Guard.IsEqualTo(Inner.ContentId, fileUpdateEvent.NewContentId);
@@ -167,6 +171,6 @@ public class NomadKuboFile : NomadFile<Cid, EventStream<Cid>, EventStreamEntry<C
     public Task<Cid> GetCidAsync(CancellationToken cancellationToken)
     {
         Guard.IsNotNull(Inner.ContentId);
-        return Task.FromResult(Inner.ContentId);
+        return Task.FromResult((Cid)Inner.ContentId);
     }
 }

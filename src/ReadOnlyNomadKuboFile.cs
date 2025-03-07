@@ -15,7 +15,7 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A virtual file constructed by reading the roaming <see cref="NomadFileData{TContentPointer}"/> published by another node.
 /// </summary>
-public class ReadOnlyNomadKuboFile : IChildFile, IDelegable<NomadFileData<Cid>>
+public class ReadOnlyNomadKuboFile : IChildFile, IDelegable<NomadFileData<DagCid>>
 {
     /// <summary>
     /// The client to use for communicating with ipfs/kubo.
@@ -29,7 +29,7 @@ public class ReadOnlyNomadKuboFile : IChildFile, IDelegable<NomadFileData<Cid>>
     public string Name => Inner.StorableItemName;
 
     /// <inheritdoc />
-    public required NomadFileData<Cid> Inner { get; init; }
+    public required NomadFileData<DagCid> Inner { get; init; }
 
     /// <summary>
     /// The parent for this folder, if any.
