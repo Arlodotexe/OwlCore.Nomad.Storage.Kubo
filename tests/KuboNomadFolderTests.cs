@@ -102,9 +102,9 @@ public partial class NomadKuboFolderTests
         }
     }
 
-    private static async Task<NomadFolderData<Cid>> ResolveAndValidatePublishedRoamingSeedAsync(ICoreApi client, IKey roamingKey, KuboOptions kuboOptions, CancellationToken cancellationToken)
+    private static async Task<NomadFolderData<DagCid, Cid>> ResolveAndValidatePublishedRoamingSeedAsync(ICoreApi client, IKey roamingKey, KuboOptions kuboOptions, CancellationToken cancellationToken)
     {
-        var (publishedRoaming, _) = await client.ResolveDagCidAsync<NomadFolderData<Cid>>(roamingKey.Id, nocache: !kuboOptions.UseCache, cancellationToken);
+        var (publishedRoaming, _) = await client.ResolveDagCidAsync<NomadFolderData<DagCid, Cid>>(roamingKey.Id, nocache: !kuboOptions.UseCache, cancellationToken);
         Guard.IsNotNull(publishedRoaming);
         {
             Guard.IsNotEmpty(publishedRoaming.Sources);

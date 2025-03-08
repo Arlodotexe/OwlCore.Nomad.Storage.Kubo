@@ -116,11 +116,11 @@ public partial class NomadKuboFolderTests
             Guard.IsNotNull(publishedLocalAOnA);
             {
                 // Load event stream entries
-                (EventStreamEntry<DagCid>? eventStreamEntry, DagCid eventStreamEntryCid)[] eventStreamEntries = await publishedLocalAOnA.Entries.InParallel(x => clientA.ResolveDagCidAsync<EventStreamEntry<DagCid>>(x, nocache: !kuboOptions.UseCache, cancellationToken));
+                (EventStreamEntry<DagCid>? eventStreamEntry, Cid eventStreamEntryCid)[] eventStreamEntries = await publishedLocalAOnA.Entries.InParallel(x => clientA.ResolveDagCidAsync<EventStreamEntry<DagCid>>(x, nocache: !kuboOptions.UseCache, cancellationToken));
                 Guard.IsNotEmpty(eventStreamEntries);
                 
                 var sourceAddEventStreamEntries = eventStreamEntries
-                    .Where(x => x.eventStreamEntry?.EventId == ReservedEventIds.NomadEventStreamSourceAdd)
+                    .Where(x => x.eventStreamEntry?.EventId == ReservedEventIds.NomadEventStreamSourceAddEvent)
                     .Where(x=> x.eventStreamEntry is not null)
                     .Cast<(EventStreamEntry<DagCid> eventStreamEntry, DagCid eventStreamEntryCid)>()
                     .ToArray();
@@ -132,9 +132,9 @@ public partial class NomadKuboFolderTests
                 // Ensure localB is added to localA's event stream in a SourceAddEvent
                 var localBSourceAddEventUpdate = sourceAddEventUpdates
                     .Where(x=> x.Result is not null)
-                    .FirstOrDefault(x => x == localB.Key.Id);
+                    .FirstOrDefault(x => x.Result == localB.Key.Id);
                 
-                Guard.IsNotNull(localBSourceAddEventUpdate.SourceAddEvent);
+                Guard.IsNotNull(localBSourceAddEventUpdate.Result);
             }
         }
         
