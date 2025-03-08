@@ -23,7 +23,7 @@
 		<PackageReleaseNotes>
 --- 0.15.0 ---
 [Breaking]
-Inherited and implemented breaking changes from OwlCore.Nomad 0.10.0 and OwlCore.Nomad.Storage 0.10.0.
+Inherited and implemented breaking changes from OwlCore.Nomad 0.10.0, OwlCore.Nomad.Storage 0.10.0 and OwlCore.Nomad.Kubo 0.15.0.
 Code has been updated to use Cid and DagCid for TImmutablePointer and TMutablePointer, respectively. This is a breaking change for all types that implement these interfaces.
 Existing event streams will need to be recreated or migrated to the new format, if any. 
 
@@ -204,7 +204,7 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.2" />
-		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.15.0" />
+		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.15.1" />
 		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.10.0" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
 		<PackageReference Include="PolySharp" Version="1.14.1">
