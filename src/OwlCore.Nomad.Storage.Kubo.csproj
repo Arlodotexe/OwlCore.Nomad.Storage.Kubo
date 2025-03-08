@@ -16,7 +16,7 @@
 		<Author>Arlo Godfrey</Author>
 		<Version>0.15.0</Version>
 		<Product>OwlCore</Product>
-		<Description>A storage implementation powered by Nomad event sourcing on ipfs/Kubo.</Description>
+		<Description>A storage implementation powered by event stream sourcing on IPFS via Kubo</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
