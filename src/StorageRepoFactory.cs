@@ -23,9 +23,9 @@ public static class StorageRepoFactory
     /// <param name="kuboOptions">The options used to read and write data to and from Kubo.</param>
     /// <param name="folderName">The name of the folder to ues, if not already set.</param>
     /// <returns>A repository for managing peer swarms.</returns>
-    public static NomadKuboRepository<NomadKuboFolder, IFolder, NomadFolderData<Cid>, FolderUpdateEvent> GetFolderRepository(string roamingKeyName, string localKeyName, string folderName, IModifiableFolder tempCacheFolder, ICoreApi client, IKuboOptions kuboOptions)
+    public static NomadKuboRepository<NomadKuboFolder, IFolder, NomadFolderData<DagCid, Cid>, FolderUpdateEvent> GetFolderRepository(string roamingKeyName, string localKeyName, string folderName, IModifiableFolder tempCacheFolder, ICoreApi client, IKuboOptions kuboOptions)
     {
-        return new NomadKuboRepository<NomadKuboFolder, IFolder, NomadFolderData<Cid>, FolderUpdateEvent>
+        return new NomadKuboRepository<NomadKuboFolder, IFolder, NomadFolderData<DagCid, Cid>, FolderUpdateEvent>
         {
             DefaultEventStreamLabel = $"Folder {folderName}",
             Client = client,
@@ -33,7 +33,7 @@ public static class StorageRepoFactory
             GetEventStreamHandlerConfigAsync = async (roamingId, cancellationToken) =>
             {
                 var (localKey, roamingKey, foundRoamingId) = await NomadKeyHelpers.RoamingIdToNomadKeysAsync(roamingId, roamingKeyName, localKeyName, client, cancellationToken);
-                return new NomadKuboEventStreamHandlerConfig<NomadFolderData<Cid>>
+                return new NomadKuboEventStreamHandlerConfig<NomadFolderData<DagCid, Cid>>
                 {
                     RoamingId = roamingKey?.Id ?? (foundRoamingId is not null ? Cid.Decode(foundRoamingId) : null),
                     RoamingKey = roamingKey,
@@ -42,7 +42,7 @@ public static class StorageRepoFactory
                     LocalKeyName = localKeyName,
                 };
             },
-            GetDefaultRoamingValue = (localKey, roamingKey) => new NomadFolderData<Cid>
+            GetDefaultRoamingValue = (localKey, roamingKey) => new NomadFolderData<DagCid, Cid>
             {
                 StorableItemId = roamingKey.Id,
                 StorableItemName = folderName,

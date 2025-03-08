@@ -11,6 +11,6 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <remarks>
 /// Primarily use to create extension method helpers between file/folder implementations of the generic base classes.
 /// </remarks>
-public interface IReadOnlyNomadKuboFolder : IChildFolder, IMutableFolder, IDelegable<NomadFolderData<Cid>>
+public interface IReadOnlyNomadKuboFolder : IChildFolder, IMutableFolder, IDelegable<NomadFolderData<DagCid, Cid>>
 {
 }

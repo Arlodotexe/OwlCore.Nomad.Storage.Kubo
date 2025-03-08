@@ -112,30 +112,29 @@ public partial class NomadKuboFolderTests
             }
             
             // Verify published local data
-            var (publishedLocalAOnA, _) = await clientA.ResolveDagCidAsync<EventStream<Cid>>(folderA.LocalEventStreamKey.Id, !kuboOptions.UseCache, cancellationToken);
+            var (publishedLocalAOnA, _) = await clientA.ResolveDagCidAsync<EventStream<DagCid>>(folderA.LocalEventStreamKey.Id, !kuboOptions.UseCache, cancellationToken);
             Guard.IsNotNull(publishedLocalAOnA);
             {
                 // Load event stream entries
-                (EventStreamEntry<Cid>? eventStreamEntry, Cid eventStreamEntryCid)[] eventStreamEntries = await publishedLocalAOnA.Entries.InParallel(x => clientA.ResolveDagCidAsync<EventStreamEntry<Cid>>(x, nocache: !kuboOptions.UseCache, cancellationToken));
+                (EventStreamEntry<DagCid>? eventStreamEntry, Cid eventStreamEntryCid)[] eventStreamEntries = await publishedLocalAOnA.Entries.InParallel(x => clientA.ResolveDagCidAsync<EventStreamEntry<DagCid>>(x, nocache: !kuboOptions.UseCache, cancellationToken));
                 Guard.IsNotEmpty(eventStreamEntries);
                 
                 var sourceAddEventStreamEntries = eventStreamEntries
-                    .Where(x => x.eventStreamEntry?.EventId == nameof(SourceAddEvent))
+                    .Where(x => x.eventStreamEntry?.EventId == ReservedEventIds.NomadEventStreamSourceAddEvent)
                     .Where(x=> x.eventStreamEntry is not null)
-                    .Cast<(EventStreamEntry<Cid> eventStreamEntry, Cid eventStreamEntryCid)>()
+                    .Cast<(EventStreamEntry<DagCid> eventStreamEntry, DagCid eventStreamEntryCid)>()
                     .ToArray();
                 Guard.IsNotEmpty(sourceAddEventStreamEntries);
                 
-                var sourceAddEventUpdates = await sourceAddEventStreamEntries.InParallel(x => clientA.ResolveDagCidAsync<SourceAddEvent>(x.eventStreamEntry.Content, nocache: !kuboOptions.UseCache, cancellationToken));
+                var sourceAddEventUpdates = await sourceAddEventStreamEntries.InParallel(x => clientA.ResolveDagCidAsync<Cid>(x.eventStreamEntry.Content, nocache: !kuboOptions.UseCache, cancellationToken));
                 Guard.IsNotEmpty(sourceAddEventUpdates);
                 
                 // Ensure localB is added to localA's event stream in a SourceAddEvent
                 var localBSourceAddEventUpdate = sourceAddEventUpdates
                     .Where(x=> x.Result is not null)
-                    .Cast<(SourceAddEvent SourceAddEvent, Cid SourceAddEventCid)>()
-                    .FirstOrDefault(x=> x.SourceAddEvent.AddedSourcePointer == localB.Key.Id);
+                    .FirstOrDefault(x => x.Result == localB.Key.Id);
                 
-                Guard.IsNotNull(localBSourceAddEventUpdate.SourceAddEvent);
+                Guard.IsNotNull(localBSourceAddEventUpdate.Result);
             }
         }
         

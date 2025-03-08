@@ -13,9 +13,9 @@ using OwlCore.Storage;
 namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
-/// A virtual folder constructed by reading the roaming <see cref="NomadFolderData{TContentPointer}"/> published by another node.
+/// A virtual folder constructed by reading the roaming <see cref="NomadFolderData{TImmutablePointer, TMutablePointer}"/> published by another node.
 /// </summary>
-public class ReadOnlyNomadKuboFolder : IChildFolder, IDelegable<NomadFolderData<Cid>>, IGetRoot
+public class ReadOnlyNomadKuboFolder : IChildFolder, IDelegable<NomadFolderData<DagCid, Cid>>, IGetRoot
 {
     /// <summary>
     /// Creates a new instance of <see cref="ReadOnlyNomadKuboFolder"/> from the given handler configuration.
@@ -23,7 +23,7 @@ public class ReadOnlyNomadKuboFolder : IChildFolder, IDelegable<NomadFolderData<
     /// <param name="handlerConfig">The handler configuration to use.</param>
     /// <param name="client">A client that can be used for accessing ipfs.</param>
     /// <returns>A new instance of <see cref="ReadOnlyNomadKuboFolder"/>.</returns>
-    public static ReadOnlyNomadKuboFolder FromHandlerConfig(NomadKuboEventStreamHandlerConfig<NomadFolderData<Cid>> handlerConfig, ICoreApi client)
+    public static ReadOnlyNomadKuboFolder FromHandlerConfig(NomadKuboEventStreamHandlerConfig<NomadFolderData<DagCid, Cid>> handlerConfig, ICoreApi client)
     {
         Guard.IsNotNull(handlerConfig.RoamingValue);
         Guard.IsNotNull(handlerConfig.RoamingId);
@@ -49,7 +49,7 @@ public class ReadOnlyNomadKuboFolder : IChildFolder, IDelegable<NomadFolderData<
     public string Name => Inner.StorableItemName;
 
     /// <inheritdoc />
-    public required NomadFolderData<Cid> Inner { get; init; }
+    public required NomadFolderData<DagCid, Cid> Inner { get; init; }
 
     /// <summary>
     /// The parent for this folder, if any.

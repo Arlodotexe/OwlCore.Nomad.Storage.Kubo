@@ -97,7 +97,7 @@ public partial class NomadKuboFolderTests
                 await Task.WhenAll(nodeAPairingTask, nodeBPairingTask);
 
                 // Reload updated local data
-                var (publishedLocalAOnA, _) = await clientA.ResolveDagCidAsync<EventStream<Cid>>(nomadFolderA.LocalEventStreamKey.Id, !kuboOptions.UseCache, cancellationToken);
+                var (publishedLocalAOnA, _) = await clientA.ResolveDagCidAsync<EventStream<DagCid>>(nomadFolderA.LocalEventStreamKey.Id, !kuboOptions.UseCache, cancellationToken);
                 Guard.IsNotNull(publishedLocalAOnA);
                 nomadFolderA.LocalEventStream = publishedLocalAOnA;
                 nomadFolderAHandlerConfig.LocalValue = publishedLocalAOnA;

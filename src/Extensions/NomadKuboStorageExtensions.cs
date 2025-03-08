@@ -22,7 +22,7 @@ public static class NomadKuboStorageExtensions
     /// <param name="eventEntry">The event entry to apply to the given <paramref name="file"/>.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
     /// <exception cref="InvalidOperationException">Raised when the <see cref="EventStreamEntry{TContentPointer}.TargetId"/> doesn't match the <see cref="OwlCore.Storage.IStorable.Id"/> of the provided <paramref name="file"/>.</exception>
-    public static async Task TryAdvanceEventStreamAsync(this IModifiableNomadKuboFile file, EventStreamEntry<Cid> eventEntry, CancellationToken cancellationToken)
+    public static async Task TryAdvanceEventStreamAsync(this IModifiableNomadKuboFile file, EventStreamEntry<DagCid> eventEntry, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         
@@ -45,7 +45,7 @@ public static class NomadKuboStorageExtensions
     /// <param name="eventEntry">The event entry to apply to the given <paramref name="folder"/>.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
     /// <exception cref="InvalidOperationException">Raised when the <see cref="EventStreamEntry{TContentPointer}.TargetId"/> doesn't match the <see cref="OwlCore.Storage.IStorable.Id"/> of the provided <paramref name="folder"/>.</exception>
-    public static async Task TryAdvanceEventStreamAsync(this IModifiableNomadKuboFolder folder, EventStreamEntry<Cid> eventEntry, CancellationToken cancellationToken)
+    public static async Task TryAdvanceEventStreamAsync(this IModifiableNomadKuboFolder folder, EventStreamEntry<DagCid> eventEntry, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         
@@ -60,7 +60,7 @@ public static class NomadKuboStorageExtensions
         if (updateEvent?.WorkingFolderId != folder.Id)
             throw new InvalidOperationException($"The provided {nameof(updateEvent)} isn't designated for this folder and can't be applied.");
 
-        await folder.ApplyEntryUpdateAsync(updateEvent, cancellationToken);
+        await folder.ApplyEntryUpdateAsync(eventEntry, updateEvent, cancellationToken);
         folder.EventStreamPosition = eventEntry;
         Diagnostics.Logger.LogInformation($"Advanced event stream for folder {folder.Id} with {eventEntry.EventId} content {eventEntry.Content}");
     }
