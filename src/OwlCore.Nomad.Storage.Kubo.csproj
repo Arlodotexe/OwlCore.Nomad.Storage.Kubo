@@ -14,13 +14,18 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 		<Author>Arlo Godfrey</Author>
-		<Version>0.15.0</Version>
+		<Version>0.16.0</Version>
 		<Product>OwlCore</Product>
 		<Description>A storage implementation powered by event stream sourcing on IPFS via Kubo</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
 		<PackageReleaseNotes>
+--- 0.16.0 ---
+[Breaking]
+Inherited and implemented breaking changes from OwlCore.Nomad.Kubo 0.16.0
+The static StorageRepoFactory class was removed and superseded by the instantiable RoamingFolderRepository.
+
 --- 0.15.0 ---
 [Breaking]
 Inherited and implemented breaking changes from OwlCore.Nomad 0.10.0, OwlCore.Nomad.Storage 0.10.0 and OwlCore.Nomad.Kubo 0.15.0.
@@ -204,7 +209,7 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.2" />
-		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.15.1" />
+		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.16.0" />
 		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.10.0" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
 		<PackageReference Include="PolySharp" Version="1.14.1">
