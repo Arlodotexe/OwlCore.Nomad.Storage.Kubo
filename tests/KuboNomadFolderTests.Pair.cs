@@ -5,7 +5,6 @@ using OwlCore.Nomad.Kubo;
 using OwlCore.Storage.System.IO;
 using OwlCore.Diagnostics;
 using OwlCore.Extensions;
-using OwlCore.Nomad.Kubo.Events;
 
 namespace OwlCore.Nomad.Storage.Kubo.Tests;
 
@@ -42,18 +41,25 @@ public partial class NomadKuboFolderTests
         var clientB = kuboB.Client;
         {
             var folderId = nameof(PairingTestAsync);
-            var roamingKeyName = $"Nomad.Storage.Roaming.{folderId}";
-            var localKeyName = $"Nomad.Storage.Local.{folderId}";
             
             // Create local AND roaming keys for nodeA.
             // During pairing, roamingA will be exported to nodeB, and localB will be added to the event stream for localA.
-            var localARepo = StorageRepoFactory.GetFolderRepository(roamingKeyName, localKeyName, folderId, nodeACacheFolder, clientA, kuboOptions);
-            var folderA = await localARepo.CreateAsync(cancellationToken);
-
+            var nodeAKeys = await clientA.Key.ListAsync(cancellationToken);
+            var localARepo = new RoamingFolderRepository
+            {
+                Client = clientA,
+                KuboOptions = kuboOptions,
+                TempCacheFolder = nodeACacheFolder,
+                KeyNamePrefix = "Nomad.Storage",
+                ManagedKeys = nodeAKeys.ToList(),
+            };
+            
+            var folderA = await localARepo.CreateAsync(folderId, cancellationToken);
             await folderA.FlushAsync(cancellationToken);
             
             // Only create local key for nodeB, roaming key will be imported from nodeA.
-            var localB = await NomadKeyGen.GetOrCreateLocalAsync(localKeyName, folderId, kuboOptions, clientB, cancellationToken);
+            // Reuse local key name from folder A.
+            var localB = await NomadKeyGen.GetOrCreateLocalAsync(folderA.LocalEventStreamKey.Name, folderId, kuboOptions, clientB, cancellationToken);
 
             // Execute pairing
             {
@@ -66,6 +72,8 @@ public partial class NomadKuboFolderTests
                 var password = string.Join(null, pairingCode.Skip(4));
                 
                 // Initiate pairing from node a and follow up on nodeB
+                // Use existing roaming key name from folder A
+                var roamingKeyName = folderA.RoamingKey.Name;
                 var nodeAPairingTask = KeyExchange.PairWithEncryptedPubSubAsync(kuboA, kuboOptions, clientA, kuboA.Client, (_, _) => Task.FromResult(folderA.LocalEventStreamKey), isRoamingReceiver: false, roamingKeyName, roomName, password, cancellationToken); 
                 var nodeBPairingTask = KeyExchange.PairWithEncryptedPubSubAsync(kuboB, kuboOptions, clientB, kuboB.Client, (_, _) => Task.FromResult(localB.Key), isRoamingReceiver: true, roamingKeyName, roomName, password, cancellationToken);
             
@@ -122,7 +130,7 @@ public partial class NomadKuboFolderTests
                 var sourceAddEventStreamEntries = eventStreamEntries
                     .Where(x => x.eventStreamEntry?.EventId == ReservedEventIds.NomadEventStreamSourceAddEvent)
                     .Where(x=> x.eventStreamEntry is not null)
-                    .Cast<(EventStreamEntry<DagCid> eventStreamEntry, DagCid eventStreamEntryCid)>()
+                    .Cast<(EventStreamEntry<DagCid> eventStreamEntry, Cid eventStreamEntryCid)>()
                     .ToArray();
                 Guard.IsNotEmpty(sourceAddEventStreamEntries);
                 

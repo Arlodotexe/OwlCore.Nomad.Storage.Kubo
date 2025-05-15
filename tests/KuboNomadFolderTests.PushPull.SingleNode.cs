@@ -50,8 +50,17 @@ public partial class NomadKuboFolderTests
             cacheFolder = (IModifiableFolder)await cacheFolder.CreateFolderAsync("nomad", cancellationToken: cancellationToken);
             cacheFolder = (IModifiableFolder)await cacheFolder.CreateFolderAsync(folderId, cancellationToken: cancellationToken);
 
-            var localARepo = StorageRepoFactory.GetFolderRepository(roamingKeyName, localKeyName, folderId, cacheFolder, client, kuboOptions);
-            var nomadFolder = await localARepo.CreateAsync(cancellationToken);
+            var nodeAKeys = await client.Key.ListAsync(cancellationToken);
+            var localARepo = new RoamingFolderRepository
+            {
+                Client = client,
+                KuboOptions = kuboOptions,
+                TempCacheFolder = cacheFolder,
+                KeyNamePrefix = "Nomad.Storage",
+                ManagedKeys = nodeAKeys.ToList(),
+            };
+            
+            var nomadFolder = await localARepo.CreateAsync(folderId, cancellationToken);
 
             Guard.IsNotNull(nomadFolder.ResolvedEventStreamEntries);
 
