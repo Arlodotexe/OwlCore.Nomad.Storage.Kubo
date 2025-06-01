@@ -57,7 +57,8 @@ public partial class NomadKuboFolderTests
                 KuboOptions = kuboOptions,
                 TempCacheFolder = cacheFolder,
                 KeyNamePrefix = "Nomad.Storage",
-                ManagedKeys = nodeAKeys.ToList(),
+                ManagedKeys = nodeAKeys.Select(k => new Key(k)).ToList(),
+                ManagedConfigs = [],
             };
             
             var nomadFolder = await localARepo.CreateAsync(folderId, cancellationToken);
