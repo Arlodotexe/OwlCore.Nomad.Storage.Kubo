@@ -73,7 +73,8 @@ public partial class NomadKuboFolderTests
                 KuboOptions = kuboOptions,
                 TempCacheFolder = cacheFolderA,
                 KeyNamePrefix = "Nomad.Storage",
-                ManagedKeys = nodeAKeys.ToList(),
+                ManagedKeys = nodeAKeys.Select(k => new Key(k)).ToList(),
+                ManagedConfigs = [],
             };
 
             var nomadFolderA = await localARepo.CreateAsync(folderId, cancellationToken);
@@ -108,7 +109,7 @@ public partial class NomadKuboFolderTests
                 var (publishedLocalAOnA, _) = await clientA.ResolveDagCidAsync<EventStream<DagCid>>(nomadFolderA.LocalEventStreamKey.Id, !kuboOptions.UseCache, cancellationToken);
                 Guard.IsNotNull(publishedLocalAOnA);
                 nomadFolderA.LocalEventStream = publishedLocalAOnA;
-    
+
                 var nomadFolderAHandlerConfig = localARepo.ManagedConfigs.First(x => x.RoamingId == nomadFolderA.Id);
                 nomadFolderAHandlerConfig.LocalValue = publishedLocalAOnA;
 
@@ -127,7 +128,7 @@ public partial class NomadKuboFolderTests
                 foreach (var key in nodeAKeys)
                 {
                     if (localARepo.ManagedKeys.All(x => x.Id != key.Id))
-                        localARepo.ManagedKeys.Add(key);
+                        localARepo.ManagedKeys.Add(new Key(key));
                 }
             }
 
@@ -141,6 +142,7 @@ public partial class NomadKuboFolderTests
                 _ = await ResolveAndValidatePublishedRoamingSeedAsync(clientB, roamingBKey, kuboOptions, cancellationToken);
 
                 // Push to A
+                Guard.IsNotNull(nomadFolderA.ResolvedEventStreamEntries);
                 await sourceFolder.CopyToAsync(nomadFolderA, storable => GetLastWriteTimeFor(storable, nomadFolderA.ResolvedEventStreamEntries), cancellationToken);
 
                 // Publish A
@@ -152,11 +154,13 @@ public partial class NomadKuboFolderTests
                     KuboOptions = kuboOptions,
                     TempCacheFolder = cacheFolderB,
                     KeyNamePrefix = "Nomad.Storage",
-                    ManagedKeys = keysB.ToList(),
+                    ManagedKeys = keysB.Select(k => new Key(k)).ToList(),
+                    ManagedConfigs = [],
                 };
 
                 var nomadFolderB = (NomadKuboFolder)await localBRepo.GetAsync(roamingBKey.Id, cancellationToken);
                 Guard.IsNotNull(nomadFolderB.ResolvedEventStreamEntries);
+                Guard.IsNotEmpty(nomadFolderB.ResolvedEventStreamEntries);
 
                 // Pull to B
                 await nomadFolderB.CopyToAsync(destinationFolder, storable => GetLastWriteTimeFor(storable, nomadFolderB.ResolvedEventStreamEntries), cancellationToken);
@@ -186,6 +190,7 @@ public partial class NomadKuboFolderTests
                     Guard.IsNotNull(nomadFolderA.Sources.FirstOrDefault(x => x == nomadFolderA.LocalEventStreamKey.Id));
                     Guard.IsEqualTo(nomadFolderA.Sources.Count, 2);
                     Guard.IsNotNull(nomadFolderA.ResolvedEventStreamEntries);
+                    Guard.IsNotEmpty(nomadFolderA.ResolvedEventStreamEntries);
 
                     await nomadFolderA.CopyToAsync(sourceFolder, storable => GetLastWriteTimeFor(storable, nomadFolderA.ResolvedEventStreamEntries), cancellationToken);
                 }

@@ -45,7 +45,7 @@ public class NomadKuboFolder : NomadFolder<DagCid, Cid, EventStream<DagCid>, Eve
             EventStreamHandlerId = handlerConfig.RoamingKey.Id,
             Inner = handlerConfig.RoamingValue,
             RoamingKey = handlerConfig.RoamingKey,
-            Sources = handlerConfig.RoamingValue.Sources,
+            Sources = handlerConfig.Sources,
             LocalEventStreamKey = handlerConfig.LocalKey,
             LocalEventStream = handlerConfig.LocalValue,
             ResolvedEventStreamEntries = handlerConfig.ResolvedEventStreamEntries,
