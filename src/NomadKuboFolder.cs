@@ -20,7 +20,7 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A virtual file constructed by advancing an <see cref="IEventStreamHandler{TImmutableContent, TMutableContent, TEventStream, TEventStreamEntry}.EventStreamPosition"/> using multiple <see cref="ISources{T}.Sources"/>.
 /// </summary>
-public class NomadKuboFolder : NomadFolder<DagCid, Cid, EventStream<DagCid>, EventStreamEntry<DagCid>>, IModifiableNomadKuboFolder, ICreateCopyOf, IFlushable
+public class NomadKuboFolder : NomadFolder<DagCid, Cid, EventStream<DagCid>, EventStreamEntry<DagCid>>, IModifiableNomadKuboFolder, ICreateRenamedCopyOf, IFlushable
 {
     /// <summary>
     /// Creates a new instance of <see cref="NomadKuboFolder"/> from the specified handler configuration.
@@ -113,7 +113,17 @@ public class NomadKuboFolder : NomadFolder<DagCid, Cid, EventStream<DagCid>, Eve
     public override Task<IFolderWatcher> GetFolderWatcherAsync(CancellationToken cancellationToken = default) => Task.FromResult<IFolderWatcher>(new TimerBasedNomadFolderWatcher(this, UpdateCheckInterval));
 
     /// <inheritdoc />
-    public async Task<IChildFile> CreateCopyOfAsync(IFile fileToCopy, bool overwrite, CancellationToken cancellationToken, CreateCopyOfDelegate fallback)
+    public Task<IChildFile> CreateCopyOfAsync(IFile fileToCopy, bool overwrite, CancellationToken cancellationToken, CreateCopyOfDelegate fallback)
+    {
+        // For code deduplication in this implementation,
+        // route to the overload with rename support
+        // while using the given non-rename overload as fallback.
+        // This also discards the filled newName param in the fallback, which is originally passed into the newName param in the following method call:
+        return CreateCopyOfAsync(fileToCopy, overwrite, newName: fileToCopy.Name, cancellationToken, (modifiableFolder, file, overwrite, _, cancellationToken) => fallback(modifiableFolder, file, overwrite, cancellationToken));
+    }
+
+    /// <inheritdoc />
+    public async Task<IChildFile> CreateCopyOfAsync(IFile fileToCopy, bool overwrite, string newName, CancellationToken cancellationToken, CreateRenamedCopyOfDelegate fallback)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -122,15 +132,15 @@ public class NomadKuboFolder : NomadFolder<DagCid, Cid, EventStream<DagCid>, Eve
         {
             try
             {
-                var existing = await this.GetFirstByNameAsync(fileToCopy.Name, cancellationToken);
+                var existing = await this.GetFirstByNameAsync(newName, cancellationToken);
                 if (existing is not null)
-                    throw new FileAlreadyExistsException(fileToCopy.Name);
+                    throw new FileAlreadyExistsException(newName);
             }
             catch (FileNotFoundException) { }
         }
 
         // Create the destination file.
-        var storageUpdateEvent = new CreateFileInFolderEvent(Id, $"{Id}/{fileToCopy.Name}", fileToCopy.Name, overwrite);
+        var storageUpdateEvent = new CreateFileInFolderEvent(Id, $"{Id}/{newName}", newName, overwrite);
 
         var createdFileData = await ApplyFolderUpdateAsync(storageUpdateEvent, cancellationToken);
         EventStreamPosition = await AppendNewEntryAsync(Id, nameof(CreateFileInFolderEvent), storageUpdateEvent, DateTime.UtcNow, cancellationToken);
