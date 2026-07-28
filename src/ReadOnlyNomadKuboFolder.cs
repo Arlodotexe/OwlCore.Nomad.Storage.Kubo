@@ -1,21 +1,22 @@
-﻿using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
-using CommunityToolkit.Diagnostics;
+﻿using CommunityToolkit.Diagnostics;
 using Ipfs;
 using Ipfs.CoreApi;
 using OwlCore.ComponentModel;
 using OwlCore.Nomad.Kubo;
 using OwlCore.Nomad.Storage.Models;
 using OwlCore.Storage;
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace OwlCore.Nomad.Storage.Kubo;
 
 /// <summary>
 /// A virtual folder constructed by reading the roaming <see cref="NomadFolderData{TImmutablePointer, TMutablePointer}"/> published by another node.
 /// </summary>
-public class ReadOnlyNomadKuboFolder : IChildFolder, IDelegable<NomadFolderData<DagCid, Cid>>, IGetRoot
+public class ReadOnlyNomadKuboFolder : IReadOnlyNomadKuboFolder, IChildFolder, IDelegable<NomadFolderData<DagCid, Cid>>, IGetRoot
 {
     /// <summary>
     /// Creates a new instance of <see cref="ReadOnlyNomadKuboFolder"/> from the given handler configuration.
@@ -55,7 +56,33 @@ public class ReadOnlyNomadKuboFolder : IChildFolder, IDelegable<NomadFolderData<
     /// The parent for this folder, if any.
     /// </summary>
     public required IFolder? Parent { get; init; }
-    
+
+    /// <summary>
+    /// The interval that IPNS should be checked for updates.
+    /// </summary>
+    public TimeSpan UpdateCheckInterval { get; } = TimeSpan.FromMinutes(1);
+
+    /// <inheritdoc />
+    public ILastModifiedAtOffsetProperty LastModifiedAtOffset => field ??= new NomadKuboReadOnlyLastModifiedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastModifiedAtProperty LastModifiedAt => field ??= new NomadKuboReadOnlyLastModifiedAtProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ICreatedAtOffsetProperty CreatedAtOffset => field ??= new NomadKuboReadOnlyCreatedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ICreatedAtProperty CreatedAt => field ??= new NomadKuboReadOnlyCreatedAtProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastAccessedAtOffsetProperty LastAccessedAtOffset => field ??= new NomadKuboReadOnlyLastAccessedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastAccessedAtProperty LastAccessedAt => field ??= new NomadKuboReadOnlyLastAccessedAtProperty(this, Inner);
+
+    /// <inheritdoc />
+    public Task<IFolderWatcher> GetFolderWatcherAsync(CancellationToken cancellationToken = default) => Task.FromResult<IFolderWatcher>(new TimerBasedNomadFolderWatcher(this, UpdateCheckInterval));
+
     /// <inheritdoc />
     public async IAsyncEnumerable<IStorableChild> GetItemsAsync(StorableType type = StorableType.All, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {

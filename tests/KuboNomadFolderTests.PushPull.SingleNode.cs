@@ -46,7 +46,7 @@ public partial class NomadKuboFolderTests
                 
             var client = kubo.Client;
             var mfsRoot = new MfsFolder("/", client);
-            var cacheFolder = (IModifiableFolder)await mfsRoot.CreateFolderAsync(".cache", cancellationToken: cancellationToken);
+            var cacheFolder = (IModifiableFolder)await testTempFolder.CreateFolderAsync(".cache", cancellationToken: cancellationToken);
             cacheFolder = (IModifiableFolder)await cacheFolder.CreateFolderAsync("nomad", cancellationToken: cancellationToken);
             cacheFolder = (IModifiableFolder)await cacheFolder.CreateFolderAsync(folderId, cancellationToken: cancellationToken);
 
@@ -65,8 +65,8 @@ public partial class NomadKuboFolderTests
 
             Guard.IsNotNull(nomadFolder.ResolvedEventStreamEntries);
 
-            await folderToPush.CopyToAsync(nomadFolder, storable => GetLastWriteTimeFor(storable, nomadFolder.ResolvedEventStreamEntries), cancellationToken);
-            await nomadFolder.CopyToAsync(folderToPull, storable => GetLastWriteTimeFor(storable, nomadFolder.ResolvedEventStreamEntries), cancellationToken);
+            await folderToPush.CopyToAsync(nomadFolder, cancellationToken);
+            await nomadFolder.CopyToAsync(folderToPull, cancellationToken);
 
             // Verify folder contents
             await VerifyFolderContents(folderToPush, folderToPull, cancellationToken);

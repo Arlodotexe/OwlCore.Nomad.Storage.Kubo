@@ -15,7 +15,7 @@ namespace OwlCore.Nomad.Storage.Kubo;
 /// <summary>
 /// A virtual file constructed by reading the roaming <see cref="NomadFileData{TContentPointer}"/> published by another node.
 /// </summary>
-public class ReadOnlyNomadKuboFile : IChildFile, IDelegable<NomadFileData<DagCid>>
+public class ReadOnlyNomadKuboFile : IReadOnlyNomadKuboFile
 {
     /// <summary>
     /// The client to use for communicating with ipfs/kubo.
@@ -35,7 +35,25 @@ public class ReadOnlyNomadKuboFile : IChildFile, IDelegable<NomadFileData<DagCid
     /// The parent for this folder, if any.
     /// </summary>
     public required IFolder? Parent { get; init; }
-    
+
+    /// <inheritdoc />
+    public ILastModifiedAtOffsetProperty LastModifiedAtOffset => field ??= new NomadKuboReadOnlyLastModifiedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastModifiedAtProperty LastModifiedAt => field ??= new NomadKuboReadOnlyLastModifiedAtProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ICreatedAtOffsetProperty CreatedAtOffset => field ??= new NomadKuboReadOnlyCreatedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ICreatedAtProperty CreatedAt => field ??= new NomadKuboReadOnlyCreatedAtProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastAccessedAtOffsetProperty LastAccessedAtOffset => field ??= new NomadKuboReadOnlyLastAccessedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastAccessedAtProperty LastAccessedAt => field ??= new NomadKuboReadOnlyLastAccessedAtProperty(this, Inner);
+
     /// <inheritdoc />
     public async Task<Stream> OpenStreamAsync(FileAccess accessMode = FileAccess.Read, CancellationToken cancellationToken = default)
     {

@@ -44,6 +44,24 @@ public class NomadKuboFile : NomadFile<DagCid, Cid, EventStream<DagCid>, EventSt
     public ICollection<EventStreamEntry<DagCid>>? ResolvedEventStreamEntries { get; set; } = [];
 
     /// <inheritdoc />
+    public ILastModifiedAtOffsetProperty LastModifiedAtOffset => field ??= new NomadKuboLastModifiedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastModifiedAtProperty LastModifiedAt => field ??= new NomadKuboLastModifiedAtProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ICreatedAtOffsetProperty CreatedAtOffset => field ??= new NomadKuboCreatedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ICreatedAtProperty CreatedAt => field ??= new NomadKuboCreatedAtProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastAccessedAtOffsetProperty LastAccessedAtOffset => field ??= new NomadKuboLastAccessedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastAccessedAtProperty LastAccessedAt => field ??= new NomadKuboLastAccessedAtProperty(this, Inner);
+
+    /// <inheritdoc />
     public override async Task<Stream> OpenStreamAsync(FileAccess accessMode = FileAccess.Read, CancellationToken cancellationToken = default)
     {
         if (this is IModifiableNomadKuboFile { TempCacheFile: MfsFile mfsFile, Client: { } client })
@@ -53,11 +71,14 @@ public class NomadKuboFile : NomadFile<DagCid, Cid, EventStream<DagCid>, EventSt
 
             if (Inner.ContentId is null)
             {
+                // Do we need to overwrite the existing file here, or should it just not exist at this point? Responsibility may lie elsewhere. 
                 await client.Mfs.WriteAsync(mfsFile.Path, string.Empty, new MfsWriteOptions { Create = true, Count = 0, Flush = true, Truncate = true }, cancellationToken);
             }
             
             if (Inner.ContentId is not null)
             {
+                // MfsFiles have a read/write stream already and does not need LazySeekStream.
+                // This forces the MfsFile to be the same as the current content id, without lazy seeking it or complex dispose/flushes.
                 await client.Mfs.RemoveAsync(mfsFile.Path, force: true, cancel: cancellationToken);
                 await client.Mfs.CopyAsync($"/ipfs/{Inner.ContentId}", mfsFile.Path, parents: false, cancellationToken);
 
@@ -79,7 +100,7 @@ public class NomadKuboFile : NomadFile<DagCid, Cid, EventStream<DagCid>, EventSt
             }
         };
         
-        var flushToNomadOnDisposeStream = new DelegatedDisposalStream(NonDisposingStream.Create(backingStream)) { Inner = dispose };
+        var flushToNomadOnDisposeStream = new DelegatedDisposalStream(new NonDisposableStreamWrapper(backingStream)) { Inner = dispose };
 
         // Mfs can seek normally instead of lazy seeking, and supports writes.
         // Reads and writes happen with MfsStream directly,
@@ -117,7 +138,7 @@ public class NomadKuboFile : NomadFile<DagCid, Cid, EventStream<DagCid>, EventSt
     /// Appends a new <paramref name="eventEntryContent"/> to the local event stream and updates the current folder.
     /// </summary>
     /// <param name="targetId">A unique identifier that represents the scope the applied event occurred within.</param>
-    /// <param name="eventId">A unique identifier for the event that occured within this <paramref name="targetId"/>.</param>
+    /// <param name="eventId">A unique identifier for the event that occurred within this <paramref name="targetId"/>.</param>
     /// <param name="eventEntryContent">The update event data to apply and persist.</param>
     /// <param name="timestampUtc">The recorded UTC timestamp when this event entry was applied.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>

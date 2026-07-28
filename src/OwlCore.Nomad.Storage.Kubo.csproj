@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFrameworks>netstandard2.0;net8.0;net9.0;</TargetFrameworks>
+		<TargetFrameworks>netstandard2.0;net8.0;net9.0;net10.0</TargetFrameworks>
 		<Nullable>enable</Nullable>
-		<LangVersion>12.0</LangVersion>
+		<LangVersion>latest</LangVersion>
 		<WarningsAsErrors>nullable</WarningsAsErrors>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
@@ -14,13 +14,18 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 		<Author>Arlo Godfrey</Author>
-		<Version>0.17.1</Version>
+		<Version>0.18.0</Version>
 		<Product>OwlCore</Product>
 		<Description>A storage implementation powered by event stream sourcing on IPFS via Kubo</Description>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/Arlodotexe/OwlCore.Nomad.Storage.Kubo</PackageProjectUrl>
 		<PackageReleaseNotes>
+--- 0.18.0 ---
+[Improvements]
+Added net10.0 TFM.
+Updated all dependencies to the latest version.
+
 --- 0.17.1 ---
 [Improvements]
 Updated OwlCore.Storage to 0.13.0, implemented ICreateRenamedCopyOf, IMoveRenamedFrom in NomadKuboFolder.
@@ -219,15 +224,15 @@ Initial release of OwlCore.Nomad.Storage.Kubo.
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.2" />
-		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.17.1" />
-		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.10.1" />
-		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
-		<PackageReference Include="PolySharp" Version="1.14.1">
+		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.10" Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net10.0'))" />
+		<PackageReference Include="OwlCore.Nomad.Kubo" Version="0.18.0" />
+		<PackageReference Include="OwlCore.Nomad.Storage" Version="0.12.0" />
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.301" PrivateAssets="All" />
+		<PackageReference Include="PolySharp" Version="1.16.0">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="System.Linq.Async" Version="6.0.1" />
+		<PackageReference Include="System.Linq.Async" Version="7.0.1" />
 	</ItemGroup>
 
 	<ItemGroup>

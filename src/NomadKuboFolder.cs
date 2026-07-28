@@ -81,6 +81,24 @@ public class NomadKuboFolder : NomadFolder<DagCid, Cid, EventStream<DagCid>, Eve
     /// </summary>
     public TimeSpan UpdateCheckInterval { get; } = TimeSpan.FromMinutes(1);
 
+    /// <inheritdoc />
+    public ILastModifiedAtOffsetProperty LastModifiedAtOffset => field ??= new NomadKuboLastModifiedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastModifiedAtProperty LastModifiedAt => field ??= new NomadKuboLastModifiedAtProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ICreatedAtOffsetProperty CreatedAtOffset => field ??= new NomadKuboCreatedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ICreatedAtProperty CreatedAt => field ??= new NomadKuboCreatedAtProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastAccessedAtOffsetProperty LastAccessedAtOffset => field ??= new NomadKuboLastAccessedAtOffsetProperty(this, Inner);
+
+    /// <inheritdoc />
+    public ILastAccessedAtProperty LastAccessedAt => field ??= new NomadKuboLastAccessedAtProperty(this, Inner);
+
     /// <inheritdoc cref="INomadKuboEventStreamHandler{TEventEntryContent}.AppendNewEntryAsync" />
     public override async Task<EventStreamEntry<DagCid>> AppendNewEntryAsync(string targetId, string eventId, FolderUpdateEvent updateEvent, DateTime? timestampUtc = null, CancellationToken cancellationToken = default)
     {

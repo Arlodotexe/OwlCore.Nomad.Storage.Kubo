@@ -39,7 +39,7 @@ public partial class NomadKuboFolderTests
 
             var client = kubo.Client;
             var mfsRoot = new MfsFolder("/", client);
-            var cacheFolder = (IModifiableFolder)await mfsRoot.CreateFolderAsync(".cache", cancellationToken: cancellationToken);
+            var cacheFolder = (IModifiableFolder)await testTempFolder.CreateFolderAsync(".cache", cancellationToken: cancellationToken);
                 cacheFolder = (IModifiableFolder)await cacheFolder.CreateFolderAsync("nomad", cancellationToken: cancellationToken);
                 cacheFolder = (IModifiableFolder)await cacheFolder.CreateFolderAsync(folderId, cancellationToken: cancellationToken);
 
@@ -58,7 +58,7 @@ public partial class NomadKuboFolderTests
 
             {
                 // Push (copy)
-                await folderToPush.CopyToAsync(nomadFolder, storable => GetLastWriteTimeFor(storable, nomadFolder.ResolvedEventStreamEntries ?? throw new InvalidOperationException()), cancellationToken);
+                await folderToPush.CopyToAsync(nomadFolder, cancellationToken);
 
                 // Publish local/roaming data.
                 await nomadFolder.FlushAsync(cancellationToken);

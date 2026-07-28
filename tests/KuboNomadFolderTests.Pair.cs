@@ -79,6 +79,7 @@ public partial class NomadKuboFolderTests
                 var nodeBPairingTask = KeyExchange.PairWithEncryptedPubSubAsync(kuboB, kuboOptions, clientB, kuboB.Client, (_, _) => Task.FromResult(localB.Key), isRoamingReceiver: true, roamingKeyName, roomName, password, cancellationToken);
             
                 await Task.WhenAll(nodeAPairingTask, nodeBPairingTask);
+                await Task.Delay(2000);
             }
             
             // Verify published roaming keys

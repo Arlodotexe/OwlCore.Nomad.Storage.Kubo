@@ -115,20 +115,6 @@ public partial class NomadKuboFolderTests
         }
         return publishedRoaming;
     }
-
-    public static DateTime GetLastWriteTimeFor(IStorable storable, IEnumerable<EventStreamEntry<DagCid>> eventStreamEntries)
-    {
-        return storable switch
-        {
-            NomadKuboFile nFile => eventStreamEntries.Where(x => x.TargetId == nFile.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
-            NomadKuboFolder nFolder => eventStreamEntries.Where(x => x.TargetId == nFolder.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
-            ReadOnlyNomadKuboFile nFile => eventStreamEntries.Where(x => x.TargetId == nFile.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
-            ReadOnlyNomadKuboFolder nFolder => eventStreamEntries.Where(x => x.TargetId == nFolder.Id).Max(x => x.TimestampUtc) ?? ThrowHelper.ThrowNotSupportedException<DateTime>("Unhandled code path"),
-            SystemFolder systemFolder => systemFolder.Info.LastWriteTimeUtc,
-            SystemFile systemFile => systemFile.Info.LastWriteTimeUtc,
-            _ => throw new ArgumentOutOfRangeException(nameof(storable), storable, null)
-        };
-    }
     
     /// <summary>
     /// Creates a temp folder for the test fixture to work in, safely unlocking and removing existing files if needed.

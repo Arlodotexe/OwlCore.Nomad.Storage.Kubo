@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using CommunityToolkit.Diagnostics;
 using OwlCore.Diagnostics;
 using OwlCore.Extensions;
 using OwlCore.Storage;
@@ -18,12 +19,12 @@ public static partial class StorageExtensions
     /// <param name="getLastUpdateTime">A callback to provide the last update time for a given <see cref="IStorable"/>.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the ongoing operation.</param>
     /// <exception cref="ArgumentException">Source folder yielded a child item that isn't a file or folder.</exception>
-    public static async Task CopyToAsync(this IFolder sourceFolder, IModifiableFolder destinationFolder, Func<IStorable, DateTime>? getLastUpdateTime = null, CancellationToken cancellationToken = default, IChildFile? gitignoreFile = null)
+    public static async Task CopyToAsync(this IFolder sourceFolder, IModifiableFolder destinationFolder, CancellationToken cancellationToken = default, IChildFile? gitignoreFile = null)
     {
         // Create a dictionary of destination items.
         // Items are gradually removed as source items are copied to destination.
         // Whatever is left in this dictionary is a list of items not present in the source folder.
-        var destinationItemsByName = await destinationFolder.GetItemsAsync(StorableType.All, cancellationToken).ToDictionaryAsync(item => item.Name, item => item, cancellationToken);
+        var destinationItemsByName = await destinationFolder.GetItemsAsync(StorableType.All, cancellationToken).ToDictionaryAsync(item => item.Name, null, cancellationToken);
 
         var gitignore = new Ignore.Ignore();
         IFolder? gitignoreFolder = null;
@@ -74,7 +75,7 @@ public static partial class StorageExtensions
                 // Create or get existing subfolder in the destination and recursively synchronize.
                 var destinationSubFolder = (IModifiableFolder)await destinationFolder.CreateFolderAsync(sourceSubFolder.Name, overwrite: false, cancellationToken);
 
-                await sourceSubFolder.CopyToAsync(destinationSubFolder, getLastUpdateTime, cancellationToken, gitignoreFile);
+                await sourceSubFolder.CopyToAsync(destinationSubFolder, cancellationToken, gitignoreFile);
                 continue;
             }
 
@@ -90,8 +91,8 @@ public static partial class StorageExtensions
                 existingDestinationFile = (IFile)await destinationFolder.GetFirstByNameAsync(sourceFile.Name, cancellationToken);
 
                 // Compare the last modified dates
-                var destinationLastModified = getLastUpdateTime?.Invoke(existingDestinationFile);
-                var sourceLastModified = getLastUpdateTime?.Invoke(sourceFile);
+                var destinationLastModified = await existingDestinationFile.LastModifiedAt!.GetValueAsync(cancellationToken);
+                var sourceLastModified = await sourceFile.LastModifiedAt!.GetValueAsync(cancellationToken);
 
                 sourceIsNewerOrSame = sourceLastModified >= destinationLastModified;
             }
